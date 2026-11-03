@@ -1,0 +1,21 @@
+{
+  "short_name": "EcoFood",
+  "name": "EcoFood - Red de Rescate de Alimentos",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#F8FAF7",
+  "theme_color": "#1B5E20",
+  "display": "standalone",
+  "orientation": "portrait"
+}
