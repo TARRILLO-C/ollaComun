@@ -20,8 +20,11 @@ import {
   ArrowUp,
   ArrowDown,
   Lock,
-  X
+  X,
+  UserCheck,
+  Sparkles
 } from 'lucide-react';
+import { consultarDni, consultarRuc, obtenerDireccionDesdeCoordenadas } from '../services/yupayService';
 
 export const RegisterBodega = ({ onBack, onRegistrationSuccess }) => {
   const fileInputRef = useRef(null);
@@ -35,6 +38,11 @@ export const RegisterBodega = ({ onBack, onRegistrationSuccess }) => {
   const [address, setAddress] = useState('');
   const [facadeFile, setFacadeFile] = useState(null);
   const [facadePreview, setFacadePreview] = useState(null);
+
+  // Estados de consulta DNI / RUC con Yupay
+  const [isSearchingDoc, setIsSearchingDoc] = useState(false);
+  const [docSuccessMessage, setDocSuccessMessage] = useState('');
+  const [docErrorMessage, setDocErrorMessage] = useState('');
 
   // Ubicación Google Maps / GPS
   const [coords, setCoords] = useState({ latitude: -12.0154, longitude: -76.9982 });
@@ -144,6 +152,66 @@ export const RegisterBodega = ({ onBack, onRegistrationSuccess }) => {
     setLocationDetected(true);
   };
 
+  const handleConsultarDocumento = async (numberToQuery) => {
+    const target = numberToQuery || docNumber;
+    const cleanDoc = (target || '').trim().replace(/\D/g, '');
+
+    if (docType === 'DNI') {
+      if (cleanDoc.length !== 8) {
+        setDocErrorMessage('Ingresa un DNI de 8 dígitos para consultar.');
+        return;
+      }
+
+      setIsSearchingDoc(true);
+      setDocErrorMessage('');
+      setDocSuccessMessage('');
+
+      try {
+        const res = await consultarDni(cleanDoc);
+        if (res.success && res.data) {
+          const nombre = res.data.nombreCompleto || `${res.data.nombres} ${res.data.apellidoPaterno} ${res.data.apellidoMaterno}`.trim();
+          if (!businessName.trim()) {
+            setBusinessName(`Bodega ${res.data.nombres.split(' ')[0]}`);
+          }
+          setDocSuccessMessage(`DNI verificado: ${nombre}`);
+          if (errors.docNumber) setErrors(prev => ({ ...prev, docNumber: undefined }));
+          if (errors.businessName) setErrors(prev => ({ ...prev, businessName: undefined }));
+        } else {
+          setDocErrorMessage(res.error || 'No se pudo obtener información del DNI.');
+        }
+      } finally {
+        setIsSearchingDoc(false);
+      }
+    } else if (docType === 'RUC') {
+      if (cleanDoc.length !== 11) {
+        setDocErrorMessage('Ingresa un RUC de 11 dígitos para consultar.');
+        return;
+      }
+
+      setIsSearchingDoc(true);
+      setDocErrorMessage('');
+      setDocSuccessMessage('');
+
+      try {
+        const res = await consultarRuc(cleanDoc);
+        if (res.success && res.data) {
+          const rucData = res.data;
+          setBusinessName(rucData.razonSocial);
+          if (rucData.direccion && !address.trim()) {
+            setAddress(rucData.direccion);
+          }
+          setDocSuccessMessage(`RUC verificado: ${rucData.razonSocial} (${rucData.estado} - ${rucData.condicion})`);
+          if (errors.docNumber) setErrors(prev => ({ ...prev, docNumber: undefined }));
+          if (errors.businessName) setErrors(prev => ({ ...prev, businessName: undefined }));
+        } else {
+          setDocErrorMessage(res.error || 'No se pudo obtener información del RUC.');
+        }
+      } finally {
+        setIsSearchingDoc(false);
+      }
+    }
+  };
+
   const handleNudgePin = (deltaLat, deltaLng) => {
     setMapSearchText('');
     setCoords(prev => ({
@@ -216,13 +284,25 @@ export const RegisterBodega = ({ onBack, onRegistrationSuccess }) => {
     }
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
         setCoords({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
+          latitude: lat,
+          longitude: lng,
         });
-        setIsLocating(false);
         setLocationDetected(true);
+
+        // Autocompletar la dirección con la ubicación obtenida por GPS
+        try {
+          const dirObtenida = await obtenerDireccionDesdeCoordenadas(lat, lng);
+          if (dirObtenida) {
+            setAddress(dirObtenida);
+            if (errors.address) setErrors(prev => ({ ...prev, address: undefined }));
+          }
+        } finally {
+          setIsLocating(false);
+        }
       },
       (error) => {
         console.warn('GPS error:', error);
@@ -327,7 +407,12 @@ export const RegisterBodega = ({ onBack, onRegistrationSuccess }) => {
               <div className="grid grid-cols-2 gap-2 mb-2">
                 <button
                   type="button"
-                  onClick={() => { setDocType('RUC'); setDocNumber(''); }}
+                  onClick={() => { 
+                    setDocType('RUC'); 
+                    setDocNumber(''); 
+                    setDocSuccessMessage('');
+                    setDocErrorMessage('');
+                  }}
                   className={`py-2 text-xs font-bold rounded-xl border transition-all ${
                     docType === 'RUC'
                       ? 'bg-emerald-700 border-emerald-700 text-white shadow-sm'
@@ -338,7 +423,12 @@ export const RegisterBodega = ({ onBack, onRegistrationSuccess }) => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setDocType('DNI'); setDocNumber(''); }}
+                  onClick={() => { 
+                    setDocType('DNI'); 
+                    setDocNumber(''); 
+                    setDocSuccessMessage('');
+                    setDocErrorMessage('');
+                  }}
                   className={`py-2 text-xs font-bold rounded-xl border transition-all ${
                     docType === 'DNI'
                       ? 'bg-emerald-700 border-emerald-700 text-white shadow-sm'
@@ -350,21 +440,63 @@ export const RegisterBodega = ({ onBack, onRegistrationSuccess }) => {
               </div>
 
               {/* Input Documento */}
-              <div className="relative">
-                <input
-                  type="text"
-                  maxLength={docType === 'RUC' ? 11 : 8}
-                  value={docNumber}
-                  onChange={(e) => setDocNumber(e.target.value.replace(/\D/g, ''))}
-                  placeholder={docType === 'RUC' ? 'Ej. 20601234567 (11 dígitos)' : 'Ej. 45678912 (8 dígitos)'}
-                  className={`w-full bg-slate-50 border ${
-                    errors.docNumber ? 'border-red-400 focus:border-red-500 ring-1 ring-red-400' : 'border-slate-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600'
-                  } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all font-mono`}
-                />
-                <span className="absolute right-3 top-2.5 text-xs font-semibold text-slate-400">
-                  {docNumber.length}/{docType === 'RUC' ? 11 : 8}
-                </span>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    maxLength={docType === 'RUC' ? 11 : 8}
+                    value={docNumber}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setDocNumber(val);
+                      setDocSuccessMessage('');
+                      setDocErrorMessage('');
+                      if (errors.docNumber) setErrors(prev => ({ ...prev, docNumber: undefined }));
+                      if (docType === 'DNI' && val.length === 8) {
+                        handleConsultarDocumento(val);
+                      } else if (docType === 'RUC' && val.length === 11) {
+                        handleConsultarDocumento(val);
+                      }
+                    }}
+                    placeholder={docType === 'RUC' ? 'Ej. 20100055237 (11 dígitos)' : 'Ej. 45678912 (8 dígitos)'}
+                    className={`w-full bg-slate-50 border ${
+                      errors.docNumber ? 'border-red-400 focus:border-red-500 ring-1 ring-red-400' : 'border-slate-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600'
+                    } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all font-mono`}
+                  />
+                  <span className="absolute right-3 top-2.5 text-xs font-semibold text-slate-400">
+                    {docNumber.length}/{docType === 'RUC' ? 11 : 8}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isSearchingDoc || (docType === 'DNI' ? docNumber.length !== 8 : docNumber.length !== 11)}
+                  onClick={() => handleConsultarDocumento()}
+                  className="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shrink-0 cursor-pointer"
+                  title={docType === 'RUC' ? 'Consultar RUC en SUNAT' : 'Consultar DNI en RENIEC'}
+                >
+                  {isSearchingDoc ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : (
+                    <Search size={15} />
+                  )}
+                  <span className="hidden sm:inline">Validar</span>
+                </button>
               </div>
+
+              {docSuccessMessage && (
+                <p className="text-emerald-700 text-xs mt-1.5 flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg p-1.5 font-medium">
+                  <UserCheck size={14} className="text-emerald-600 shrink-0" />
+                  <span className="truncate">{docSuccessMessage}</span>
+                </p>
+              )}
+
+              {docErrorMessage && (
+                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                  <AlertCircle size={12} /> {docErrorMessage}
+                </p>
+              )}
+
               {errors.docNumber && (
                 <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
                   <AlertCircle size={13} /> {errors.docNumber}

@@ -10,14 +10,17 @@ import {
   MapPin, 
   Navigation, 
   Compass, 
-  ExternalLink,
-  Users,
-  HeartHandshake,
-  Search,
-  Crosshair,
-  Lock,
-  X
+  ExternalLink, 
+  Users, 
+  HeartHandshake, 
+  Search, 
+  Crosshair, 
+  Lock, 
+  X,
+  UserCheck,
+  Sparkles
 } from 'lucide-react';
+import { consultarDni, obtenerDireccionDesdeCoordenadas } from '../services/yupayService';
 
 export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
   // Form states
@@ -28,6 +31,11 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [racionesDiarias, setRacionesDiarias] = useState('80');
+
+  // Estados de consulta DNI con Yupay
+  const [isSearchingDni, setIsSearchingDni] = useState(false);
+  const [dniSuccessMessage, setDniSuccessMessage] = useState('');
+  const [dniErrorMessage, setDniErrorMessage] = useState('');
 
   // Coordenadas Google Maps / GPS
   const [coords, setCoords] = useState({ latitude: -12.0210, longitude: -77.0015 });
@@ -136,6 +144,34 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
     setLocationDetected(true);
   };
 
+  const handleConsultarDni = async (numberToQuery) => {
+    const target = numberToQuery || docNumber;
+    const cleanDni = (target || '').trim().replace(/\D/g, '');
+    if (cleanDni.length !== 8) {
+      setDniErrorMessage('Ingresa un DNI de 8 dígitos para consultar.');
+      return;
+    }
+
+    setIsSearchingDni(true);
+    setDniErrorMessage('');
+    setDniSuccessMessage('');
+
+    try {
+      const res = await consultarDni(cleanDni);
+      if (res.success && res.data) {
+        const nombre = res.data.nombreCompleto || `${res.data.nombres} ${res.data.apellidoPaterno} ${res.data.apellidoMaterno}`.trim();
+        setRepresentativeName(nombre);
+        setDniSuccessMessage(`DNI verificado: ${nombre}`);
+        if (errors.representativeName) setErrors(prev => ({ ...prev, representativeName: undefined }));
+        if (errors.docNumber) setErrors(prev => ({ ...prev, docNumber: undefined }));
+      } else {
+        setDniErrorMessage(res.error || 'No se pudo obtener información del DNI.');
+      }
+    } finally {
+      setIsSearchingDni(false);
+    }
+  };
+
   const handleNudgePin = (deltaLat, deltaLng) => {
     setMapSearchText('');
     setCoords(prev => ({
@@ -190,13 +226,25 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
     }
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
         setCoords({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
+          latitude: lat,
+          longitude: lng,
         });
-        setIsLocating(false);
         setLocationDetected(true);
+
+        // Autocompletar la dirección con la ubicación obtenida por GPS
+        try {
+          const dirObtenida = await obtenerDireccionDesdeCoordenadas(lat, lng);
+          if (dirObtenida) {
+            setAddress(dirObtenida);
+            if (errors.address) setErrors(prev => ({ ...prev, address: undefined }));
+          }
+        } finally {
+          setIsLocating(false);
+        }
       },
       (error) => {
         console.warn('GPS error:', error);
@@ -345,23 +393,70 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1">
-                  <ShieldCheck size={13} />
-                  DNI de la Responsable (8 dígitos)
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <ShieldCheck size={13} />
+                    DNI de la Responsable (8 dígitos)
+                  </span>
+                  <span className="text-[10px] text-orange-600 font-bold flex items-center gap-1">
+                    <Sparkles size={11} /> Autocompletar
+                  </span>
                 </label>
-                <input
-                  type="text"
-                  maxLength={8}
-                  value={docNumber}
-                  onChange={(e) => {
-                    setDocNumber(e.target.value.replace(/\D/g, ''));
-                    if (errors.docNumber) setErrors(prev => ({ ...prev, docNumber: undefined }));
-                  }}
-                  placeholder="Ej. 45678912"
-                  className={`w-full bg-slate-50 border ${
-                    errors.docNumber ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
-                  } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all font-mono`}
-                />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      maxLength={8}
+                      value={docNumber}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setDocNumber(val);
+                        setDniSuccessMessage('');
+                        setDniErrorMessage('');
+                        if (errors.docNumber) setErrors(prev => ({ ...prev, docNumber: undefined }));
+                        if (val.length === 8) {
+                          handleConsultarDni(val);
+                        }
+                      }}
+                      placeholder="Ej. 45678912"
+                      className={`w-full bg-slate-50 border ${
+                        errors.docNumber ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
+                      } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all font-mono`}
+                    />
+                    <span className="absolute right-3 top-2.5 text-xs font-semibold text-slate-400">
+                      {docNumber.length}/8
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isSearchingDni || docNumber.length !== 8}
+                    onClick={() => handleConsultarDni()}
+                    className="px-3 py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shrink-0 cursor-pointer"
+                    title="Consultar datos en RENIEC con Yupay"
+                  >
+                    {isSearchingDni ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <Search size={15} />
+                    )}
+                    <span className="hidden sm:inline">Validar</span>
+                  </button>
+                </div>
+
+                {dniSuccessMessage && (
+                  <p className="text-emerald-700 text-xs mt-1.5 flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-lg p-1.5 font-medium">
+                    <UserCheck size={14} className="text-emerald-600 shrink-0" />
+                    <span className="truncate">{dniSuccessMessage}</span>
+                  </p>
+                )}
+
+                {dniErrorMessage && (
+                  <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                    <AlertCircle size={12} /> {dniErrorMessage}
+                  </p>
+                )}
+
                 {errors.docNumber && (
                   <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
                     <AlertCircle size={12} /> {errors.docNumber}

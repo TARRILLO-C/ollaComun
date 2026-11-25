@@ -90,7 +90,7 @@ public class DonacionController {
 
             int comedoresCercanosAlertados = 4;
             log.info("Donación {} registrada. Se emitieron alertas a {} comedores en radio de 2 km", 
-                    donationId, comedoresAlertados);
+                    donationId, comedoresCercanosAlertados);
 
             DonacionResponse response = DonacionResponse.success(
                     donationId,

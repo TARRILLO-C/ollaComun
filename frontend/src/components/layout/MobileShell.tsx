@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useEcoFood } from '../../context/EcoFoodContext';
 import { 
   Store, 
@@ -12,7 +12,9 @@ import {
   Sliders,
   ChevronUp,
   ChevronDown,
-  Plus
+  Plus,
+  Download,
+  Smartphone
 } from 'lucide-react';
 
 interface MobileShellProps {
@@ -31,6 +33,44 @@ export const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
   } = useEcoFood();
 
   const [showDevPill, setShowDevPill] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [showInstallBanner, setShowInstallBanner] = useState(true);
+
+  // Escuchar el evento PWA 'beforeinstallprompt' para descarga e instalación en local
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Ocultar si ya se instaló
+    window.addEventListener('appinstalled', () => {
+      setIsInstallable(false);
+      setDeferredPrompt(null);
+    });
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsInstallable(false);
+      }
+      setDeferredPrompt(null);
+    } else {
+      // Guía rápida si el navegador no soporta el prompt directo (ej. Safari o escritorio manual)
+      alert('Para instalar en tu celular o PC:\n\n1. En Chrome/Edge: Presiona el ícono "Instalar" en la barra de direcciones o menú "Instalar EcoFood".\n2. En iPhone/Safari: Presiona "Compartir" y luego "Agregar a pantalla de inicio".');
+    }
+  };
 
   return (
     <>
@@ -75,6 +115,18 @@ export const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
         {/* Dispositivo Mobile Status Bar Limpia y Moderna */}
         <div className="device-status-bar">
           <span className="font-mono font-bold text-slate-700">09:41</span>
+          
+          {/* Botón Descargar PWA / Instalar App */}
+          <button
+            type="button"
+            onClick={handleInstallClick}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-extrabold transition-all border border-emerald-300 shadow-2xs cursor-pointer active:scale-95"
+            title="Descargar e instalar EcoFood en tu dispositivo"
+          >
+            <Download size={11} strokeWidth={2.5} />
+            <span>Instalar App</span>
+          </button>
+
           <div className="flex items-center gap-1.5 text-slate-600">
             <Wifi size={12} />
             <span className="text-[10px] font-bold">5G</span>

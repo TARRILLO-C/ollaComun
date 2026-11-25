@@ -1,5 +1,7 @@
 package com.ecofood.donations.repository;
 
+import com.ecofood.donations.entity.Donacion;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -7,7 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface DonacionRepository {
+public interface DonacionRepository extends JpaRepository<Donacion, Long> {
 
     /**
      * Consulta Nativa Adaptada para MySQL 8+:
