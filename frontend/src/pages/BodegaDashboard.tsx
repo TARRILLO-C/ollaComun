@@ -18,7 +18,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { NuevaDonacionForm } from './NuevaDonacionForm';
-import { QRScanner } from './QRScanner';
+import { ValidarEntregaModal } from './ValidarEntregaModal';
 import { Transparencia } from './Transparencia';
 import { EditProfileModal } from './EditProfileModal';
 
@@ -88,10 +88,11 @@ export const BodegaDashboard: React.FC = () => {
 
   if (showScanner) {
     return (
-      <QRScanner 
+      <ValidarEntregaModal 
         onBack={() => setShowScanner(false)} 
-        onScanSuccess={handleValidation}
-        onManualPinSubmit={handleValidation}
+        onSuccess={() => {
+          setShowScanner(false);
+        }}
       />
     );
   }
