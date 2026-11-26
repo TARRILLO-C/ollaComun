@@ -33,13 +33,31 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
   const isAndroid = /Android/.test(navigator.userAgent);
 
-  const handleActionClick = () => {
+  const handleActionClick = async () => {
+    // 1. Revisar si window.deferredPwaPrompt está disponible globalmente
+    const promptEvent = (window as any).deferredPwaPrompt;
+    if (promptEvent && typeof promptEvent.prompt === 'function') {
+      try {
+        promptEvent.prompt();
+        const choice = await promptEvent.userChoice;
+        if (choice && choice.outcome === 'accepted') {
+          (window as any).deferredPwaPrompt = null;
+        }
+        onClose();
+        return;
+      } catch (e) {
+        console.warn('Error al ejecutar prompt PWA nativo:', e);
+      }
+    }
+
     if (canInstallNative) {
       onNativeInstall();
       onClose();
-    } else {
-      setInstallClicked(true);
+      return;
     }
+
+    // Si el navegador requiere interacción manual (como Safari o Edge desktop sin prompt anticipado)
+    setInstallClicked(true);
   };
 
   return (
