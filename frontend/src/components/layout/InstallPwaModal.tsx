@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Download, 
   X, 
@@ -9,7 +9,8 @@ import {
   MoreVertical, 
   CheckCircle2, 
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Info
 } from 'lucide-react';
 
 interface InstallPwaModalProps {
@@ -27,13 +28,24 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  const [installClicked, setInstallClicked] = useState(false);
+
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
   const isAndroid = /Android/.test(navigator.userAgent);
 
+  const handleActionClick = () => {
+    if (canInstallNative) {
+      onNativeInstall();
+      onClose();
+    } else {
+      setInstallClicked(true);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden max-h-[90vh] flex flex-col animate-in slide-in-from-bottom duration-300"
+        className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden max-h-[92vh] flex flex-col animate-in slide-in-from-bottom duration-300"
         role="dialog"
         aria-modal="true"
       >
@@ -63,51 +75,63 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({
           </div>
           
           <p className="text-xs text-emerald-100 mt-3 leading-relaxed">
-            Úsala como una app nativa en tu celular o computadora: sin ocupar espacio, con acceso directo y alertas instantáneas de alimentos.
+            Instálala en tu dispositivo sin ocupar espacio de memoria, con acceso directo y alertas de alimentos al instante.
           </p>
         </div>
 
-        {/* Contenido / Pasos según plataforma */}
+        {/* Contenido / Botón y Pasos */}
         <div className="p-5 space-y-4 overflow-y-auto">
-          {/* Si el navegador soporta el prompt nativo directo */}
-          {canInstallNative && (
-            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
-              <div className="flex items-center gap-3 mb-3">
-                <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
-                <div>
-                  <h4 className="text-sm font-black text-slate-800">Instalación con 1 Clic Lista</h4>
-                  <p className="text-xs text-slate-600">Tu navegador permite descarga e instalación directa.</p>
-                </div>
+          {/* BOTÓN PRINCIPAL DE INSTALACIÓN SIEMPRE VISIBLE */}
+          <div className="p-4 rounded-2xl bg-gradient-to-b from-emerald-50 to-teal-50 border-2 border-emerald-500/40 shadow-xs">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                <Download size={20} />
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  onNativeInstall();
-                  onClose();
-                }}
-                className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-extrabold text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
-              >
-                <Download size={18} />
-                <span>Instalar Ahora Directamente</span>
-              </button>
+              <div>
+                <h4 className="text-sm font-black text-slate-800">Descargar e Instalar en 1 Paso</h4>
+                <p className="text-xs text-slate-600">
+                  {canInstallNative 
+                    ? 'Tu navegador está listo para instalarla automáticamente.' 
+                    : 'Agrega el acceso directo oficial a tu pantalla de inicio.'}
+                </p>
+              </div>
             </div>
-          )}
+
+            <button
+              type="button"
+              onClick={handleActionClick}
+              className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-extrabold text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              <Download size={18} strokeWidth={2.5} />
+              <span>Instalar EcoFood en este Dispositivo</span>
+            </button>
+
+            {/* Aviso tras hacer clic si el navegador requiere un toque manual */}
+            {installClicked && !canInstallNative && (
+              <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2 animate-in fade-in">
+                <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                <p>
+                  Tu navegador {isIOS ? 'Safari' : 'web'} requiere que confirmes la instalación: sigue los 2 pasos rápidos que se resaltan abajo.
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Guía Visual Paso a Paso */}
-          <div className="space-y-3">
+          <div className="space-y-3 pt-1">
             <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <span>Instrucciones rápidas</span>
+              <span>¿Cómo se agrega en cada navegador?</span>
             </h4>
 
             {/* Caso iPhone / iPad / Safari */}
-            <div className={`p-3.5 rounded-2xl border transition-all ${isIOS ? 'bg-amber-50/60 border-amber-300 ring-2 ring-amber-400/20' : 'bg-slate-50 border-slate-200'}`}>
+            <div className={`p-3.5 rounded-2xl border transition-all ${isIOS || installClicked ? 'bg-amber-50/60 border-amber-300 ring-2 ring-amber-400/20' : 'bg-slate-50 border-slate-200'}`}>
               <div className="flex items-center gap-2.5 mb-2">
                 <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
                   <Smartphone size={15} />
                 </div>
                 <div className="flex-1">
                   <span className="text-xs font-extrabold text-slate-900">En iPhone / iPad (Safari)</span>
-                  {isIOS && <span className="ml-2 text-[10px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-sm">Detectado</span>}
+                  {isIOS && <span className="ml-2 text-[10px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-sm">Tu dispositivo</span>}
                 </div>
               </div>
               <ol className="text-xs text-slate-600 space-y-2 ml-1">
@@ -130,7 +154,7 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({
                 </div>
                 <div className="flex-1">
                   <span className="text-xs font-extrabold text-slate-900">En Android (Chrome / Brave / Edge)</span>
-                  {isAndroid && <span className="ml-2 text-[10px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-sm">Detectado</span>}
+                  {isAndroid && <span className="ml-2 text-[10px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-sm">Tu dispositivo</span>}
                 </div>
               </div>
               <ol className="text-xs text-slate-600 space-y-2 ml-1">
@@ -172,7 +196,7 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({
             onClick={onClose}
             className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold text-xs transition-all cursor-pointer"
           >
-            Entendido
+            Cerrar
           </button>
         </div>
       </div>
