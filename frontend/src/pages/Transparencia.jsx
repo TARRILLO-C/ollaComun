@@ -14,8 +14,11 @@ import {
   Download,
   Clock,
   MapPin,
-  ShieldCheck
+  ShieldCheck,
+  FileSpreadsheet,
+  FileText
 } from 'lucide-react';
+import { descargarReportePDF, descargarReporteCSV } from '../utils/reportGenerator';
 
 /**
  * Transparencia.jsx - Vista de Transparencia, Historial y Métricas de Impacto
@@ -26,6 +29,56 @@ import {
  */
 export const Transparencia = ({ onBack, defaultTab = 'BODEGUERO' }) => {
   const [activeTab, setActiveTab] = useState(defaultTab); // 'BODEGUERO' | 'COMEDOR'
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  const handleDescargar = (formato) => {
+    setShowExportMenu(false);
+    if (activeTab === 'BODEGUERO') {
+      const dataBodega = {
+        titulo: 'Reporte de Impacto y Rescate de Alimentos - Bodega',
+        periodo: impactoBodega.mesActual,
+        entidadNombre: 'Bodega Solidaria Don Pepe',
+        tipoEntidad: 'BODEGA',
+        kilosTotales: impactoBodega.kilosRescatados,
+        racionesTotales: impactoBodega.racionesEquivalentes,
+        co2EvitadoKg: impactoBodega.co2EvitadoKg,
+        totalOperaciones: impactoBodega.donacionesCompletadas,
+        items: impactoBodega.historialMensual.map(h => ({
+          id: h.id,
+          fecha: h.fecha,
+          alimento: h.alimento,
+          categoria: h.categoria,
+          cantidad: h.cantidad,
+          contraparte: h.comedorReceptor,
+          metodoOEstado: h.metodo
+        }))
+      };
+      if (formato === 'PDF') descargarReportePDF(dataBodega);
+      else descargarReporteCSV(dataBodega);
+    } else {
+      const dataComedor = {
+        titulo: 'Reporte de Alimentos Recibidos y Raciones - Comedor',
+        periodo: 'Noviembre 2026',
+        entidadNombre: 'Comedor Popular Santa Rosa de Lima',
+        tipoEntidad: 'COMEDOR',
+        kilosTotales: 35.5,
+        racionesTotales: 71,
+        co2EvitadoKg: 88.7,
+        totalOperaciones: recepcionesComedor.length,
+        items: recepcionesComedor.map(r => ({
+          id: r.id,
+          fecha: r.fechaRecojo,
+          alimento: r.alimento,
+          categoria: r.categoria,
+          cantidad: r.cantidad,
+          contraparte: r.bodegaDonante,
+          metodoOEstado: `${r.estado} (PIN #${r.pinUsado})`
+        }))
+      };
+      if (formato === 'PDF') descargarReportePDF(dataComedor);
+      else descargarReporteCSV(dataComedor);
+    }
+  };
 
   // Datos mockeados de impacto mensual para la Bodega
   const impactoBodega = {
@@ -133,14 +186,45 @@ export const Transparencia = ({ onBack, defaultTab = 'BODEGUERO' }) => {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => alert('Descargando reporte de impacto certificado en formato PDF...')}
-            className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl shadow-xs transition-colors cursor-pointer"
-          >
-            <Download size={13} />
-            <span>Reporte</span>
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl shadow-xs transition-all cursor-pointer"
+            >
+              <Download size={14} />
+              <span>Descargar Reporte</span>
+            </button>
+
+            {/* Menú desplegable para elegir formato */}
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1.5 w-48 bg-white border border-slate-200 rounded-2xl shadow-xl z-30 p-1.5 flex flex-col gap-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                <button
+                  type="button"
+                  onClick={() => handleDescargar('PDF')}
+                  className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-800 hover:bg-emerald-50 hover:text-emerald-800 rounded-xl transition-colors text-left cursor-pointer"
+                >
+                  <FileText size={16} className="text-red-500 shrink-0" />
+                  <div>
+                    <span className="block font-black">Documento PDF</span>
+                    <span className="block text-[10px] text-slate-400 font-normal">Con membrete y firmas</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDescargar('CSV')}
+                  className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-slate-800 hover:bg-emerald-50 hover:text-emerald-800 rounded-xl transition-colors text-left cursor-pointer"
+                >
+                  <FileSpreadsheet size={16} className="text-emerald-600 shrink-0" />
+                  <div>
+                    <span className="block font-black">Excel / CSV</span>
+                    <span className="block text-[10px] text-slate-400 font-normal">Para contabilidad y SUNAT</span>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         </header>
 
         {/* Sistema de Pestañas (Tabs) */}
