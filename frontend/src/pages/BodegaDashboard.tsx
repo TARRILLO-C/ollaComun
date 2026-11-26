@@ -52,22 +52,14 @@ export const BodegaDashboard: React.FC = () => {
   const donacionesEntregadas = myDonations.filter(d => d.status === 'DELIVERED');
 
   const handleDonationCreated = (data: any) => {
-    let qty = 5;
-    if (data.cantidadExacta) {
-      qty = parseFloat(data.cantidadExacta);
-    } else if (data.cantidadRango === '1_5_KG') {
-      qty = 3;
-    } else if (data.cantidadRango === '5_10_KG') {
-      qty = 8;
-    } else if (data.cantidadRango === 'MAS_10_KG') {
-      qty = 15;
-    }
+    const qty = data.pesoBase || 8;
+    const raciones = data.raciones || Math.round(qty * 2);
 
     createDonation({
       title: data.notasEstado || `${data.categoria === 'PANADERIA' ? 'Panes y pastelería' : data.categoria === 'FRUTAS_VERDURAS' ? 'Verduras y frutas frescas' : 'Abarrotes y alimentos'} del día`,
       category: data.categoria,
       quantityValue: qty,
-      unitMeasure: `${qty} kg (~${Math.round(qty * 2)} raciones)`,
+      unitMeasure: `${qty} kg (~${raciones} raciones)`,
       pickupEndAt: data.pickupEndAt,
       description: data.notasEstado || 'Alimentos en perfecto estado listos para recojo inmediato.',
     });
