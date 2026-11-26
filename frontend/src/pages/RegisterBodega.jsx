@@ -334,6 +334,7 @@ export const RegisterBodega = ({ onBack, onRegistrationSuccess }) => {
             businessName,
             phone,
             address,
+            facadeFile,
             facadePreview,
             location: coords
           });

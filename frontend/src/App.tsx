@@ -24,6 +24,7 @@ const AppRouter: React.FC = () => {
               pin: userData.pin,
               phone: userData.phone,
               addressLine: userData.address,
+              facadeFile: userData.facadeFile,
               facadePhotoUrl: userData.facadePreview,
               location: userData.location,
             });

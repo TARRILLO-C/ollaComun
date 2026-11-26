@@ -40,6 +40,7 @@ export interface User {
   addressLine: string;
   district: string;
   facadePhotoUrl?: string;
+  facadeFile?: any;
   isVerified: boolean;
   location: Coordinates;
 }

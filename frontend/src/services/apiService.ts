@@ -30,8 +30,8 @@ export const ecofoodApi = {
         if (data.location?.longitude) formData.append('longitude', String(data.location.longitude));
         
         // Archivo o blob dummy para fachada si no viene
-        const blob = new Blob(['fachada'], { type: 'image/jpeg' });
-        formData.append('facadePhoto', blob, 'fachada.jpg');
+        const blob = data.facadeFile || new Blob(['fachada'], { type: 'image/jpeg' });
+        formData.append('facadePhoto', blob, data.facadeFile?.name || 'fachada.jpg');
 
         res = await fetch(`${BACKEND_BASE_URL}/api/auth/register-bodega`, {
           method: 'POST',
