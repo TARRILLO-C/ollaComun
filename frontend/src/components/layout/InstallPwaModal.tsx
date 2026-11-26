@@ -33,8 +33,21 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
   const isAndroid = /Android/.test(navigator.userAgent);
 
+  const descargarInstalador = () => {
+    // Descarga directa del archivo de acceso directo / instalador
+    const link = document.createElement('a');
+    link.href = '/EcoFood-Acceso-Directo.url';
+    link.download = 'EcoFood.url';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleActionClick = async () => {
-    // 1. Revisar si window.deferredPwaPrompt está disponible globalmente
+    // Descarga automática del acceso directo a la máquina del usuario
+    descargarInstalador();
+
+    // 1. Revisar si window.deferredPwaPrompt está disponible globalmente para disparar la PWA
     const promptEvent = (window as any).deferredPwaPrompt;
     if (promptEvent && typeof promptEvent.prompt === 'function') {
       try {
@@ -56,7 +69,6 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({
       return;
     }
 
-    // Si el navegador requiere interacción manual (como Safari o Edge desktop sin prompt anticipado)
     setInstallClicked(true);
   };
 
@@ -121,15 +133,15 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({
               className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-extrabold text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <Download size={18} strokeWidth={2.5} />
-              <span>Instalar EcoFood en este Dispositivo</span>
+              <span>Descargar e Instalar EcoFood (.url / App)</span>
             </button>
 
-            {/* Aviso tras hacer clic si el navegador requiere un toque manual */}
-            {installClicked && !canInstallNative && (
-              <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2 animate-in fade-in">
-                <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            {/* Aviso tras hacer clic */}
+            {installClicked && (
+              <div className="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs flex items-start gap-2 animate-in fade-in">
+                <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
                 <p>
-                  Tu navegador {isIOS ? 'Safari' : 'web'} requiere que confirmes la instalación: sigue los 2 pasos rápidos que se resaltan abajo.
+                  <strong>¡Descarga completada!</strong> Se ha descargado el acceso directo <code>EcoFood.url</code> a tu carpeta de descargas para abrirlo con 1 clic en tu PC.
                 </p>
               </div>
             )}
