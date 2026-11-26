@@ -34,10 +34,10 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({
   const isAndroid = /Android/.test(navigator.userAgent);
 
   const descargarInstalador = () => {
-    // Descarga directa del archivo de acceso directo / instalador
+    // Descarga del instalador de aplicación de Windows que crea la ventana independiente (.lnk)
     const link = document.createElement('a');
-    link.href = '/EcoFood-Acceso-Directo.url';
-    link.download = 'EcoFood.url';
+    link.href = '/Instalar-EcoFood.bat';
+    link.download = 'Instalar-EcoFood.bat';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -133,7 +133,7 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({
               className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-extrabold text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <Download size={18} strokeWidth={2.5} />
-              <span>Descargar e Instalar EcoFood (.url / App)</span>
+              <span>Descargar e Instalar EcoFood App</span>
             </button>
 
             {/* Aviso tras hacer clic */}
@@ -141,7 +141,7 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({
               <div className="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs flex items-start gap-2 animate-in fade-in">
                 <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
                 <p>
-                  <strong>¡Descarga completada!</strong> Se ha descargado el acceso directo <code>EcoFood.url</code> a tu carpeta de descargas para abrirlo con 1 clic en tu PC.
+                  <strong>¡Instalador descargado!</strong> Abre <code>Instalar-EcoFood.bat</code> desde tus descargas para crear automáticamente el acceso directo en tu Escritorio y abrir EcoFood como una aplicación de ventana propia (sin barra de navegador).
                 </p>
               </div>
             )}
