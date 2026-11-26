@@ -1,40 +1,14 @@
 @echo off
 setlocal
+title EcoFood - Instalador de App
 echo ======================================================
 echo    INSTALADOR DE ECOFOOD APP PARA WINDOWS
 echo ======================================================
 echo.
-echo Creando aplicacion independiente en tu Escritorio...
+echo Instalando aplicacion en tu Escritorio...
 
-set "APP_URL=http://localhost:5173"
-set "DESKTOP_PATH=%USERPROFILE%\Desktop"
-set "SHORTCUT=%DESKTOP_PATH%\EcoFood.lnk"
-
-:: Buscar ejecutable de Microsoft Edge o Google Chrome
-set "BROWSER_EXE="
-if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" (
-    set "BROWSER_EXE=%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"
-) else if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" (
-    set "BROWSER_EXE=%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
-) else if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" (
-    set "BROWSER_EXE=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
-) else if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" (
-    set "BROWSER_EXE=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
-)
-
-if "%BROWSER_EXE%"=="" (
-    echo [AVISO] Navegador no encontrado en ruta habitual. Creando enlace directo...
-    echo [InternetShortcut] > "%DESKTOP_PATH%\EcoFood.url"
-    echo URL=%APP_URL% >> "%DESKTOP_PATH%\EcoFood.url"
-    start "" "%APP_URL%"
-    exit /b 0
-)
-
-:: Crear acceso directo tipo App Standalone (sin barras de navegador, ventana propia de app)
-powershell -NoProfile -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%SHORTCUT%'); $s.TargetPath = '%BROWSER_EXE%'; $s.Arguments = '--app=%APP_URL%'; $s.Description = 'EcoFood - Red Solidaria de Rescate de Alimentos'; $s.Save()"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$desktop = [Environment]::GetFolderPath('Desktop'); $shortcutPath = Join-Path $desktop 'EcoFood.lnk'; $edge = '${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe'; if (-not (Test-Path $edge)) { $edge = '$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe' }; if (-not (Test-Path $edge)) { $edge = '$env:ProgramFiles\Google\Chrome\Application\chrome.exe' }; $ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut($shortcutPath); $s.TargetPath = $edge; $s.Arguments = '--app=http://localhost:5173'; $s.Description = 'EcoFood - Red Solidaria'; $s.WorkingDirectory = $desktop; $s.Save(); Start-Process -FilePath $edge -ArgumentList '--app=http://localhost:5173'"
 
 echo.
-echo [EXITO] La aplicacion 'EcoFood' ha sido instalada en tu Escritorio.
-echo Abriendo como aplicacion de ventana independiente...
-start "" "%SHORTCUT%"
+echo [EXITO] EcoFood se instalo en tu Escritorio y se abrio como app independiente.
 exit /b 0
