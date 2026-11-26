@@ -1,4 +1,5 @@
 {
+  "id": "/?source=pwa",
   "short_name": "EcoFood",
   "name": "EcoFood - Red Solidaria de Rescate de Alimentos",
   "description": "Conectamos bodegas donantes con comedores populares para rescatar alimentos aptos en tiempo récord.",
@@ -7,20 +8,34 @@
       "src": "/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
     },
     {
       "src": "/icon-512.png",
       "type": "image/png",
       "sizes": "512x512",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ],
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "display_override": ["standalone", "minimal-ui", "window-controls-overlay"],
+  "orientation": "portrait",
   "background_color": "#064e3b",
   "theme_color": "#059669",
-  "categories": ["food", "social", "productivity"]
+  "categories": ["food", "social", "productivity"],
+  "prefer_related_applications": false
 }
