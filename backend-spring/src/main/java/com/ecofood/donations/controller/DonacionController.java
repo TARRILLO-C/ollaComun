@@ -1,9 +1,9 @@
 package com.ecofood.donations.controller;
 
+import com.ecofood.donations.dto.DetalleEntregaResponse;
 import com.ecofood.donations.dto.DonacionResponse;
 import com.ecofood.donations.dto.NuevaDonacionRequest;
 import com.ecofood.donations.entity.Donacion;
-import com.ecofood.donations.entity.DonationStatus;
 import com.ecofood.donations.exception.DonationConflictException;
 import com.ecofood.donations.service.DonacionService;
 import org.slf4j.Logger;
@@ -47,10 +47,17 @@ public class DonacionController {
         return ResponseEntity.ok(crearDonacionesMock(latitud, longitud));
     }
 
+    /**
+     * Endpoint con soporte de Idempotencia (X-Idempotency-Key)
+     * Si la clave ya fue recibida en los últimos 5 minutos, devuelve HTTP 200 sin duplicar registros.
+     */
     @PostMapping
-    public ResponseEntity<DonacionResponse> crearDonacion(@RequestBody NuevaDonacionRequest request) {
+    public ResponseEntity<DonacionResponse> crearDonacion(
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey,
+            @RequestBody NuevaDonacionRequest request
+    ) {
         try {
-            Donacion donacion = donacionService.crearDonacion(request);
+            Donacion donacion = donacionService.crearDonacionIdempotente(request, idempotencyKey);
 
             DonacionResponse response = DonacionResponse.success(
                     donacion.getDonationUuid(),
@@ -59,13 +66,35 @@ public class DonacionController {
                     LocalDateTime.ofInstant(donacion.getPickupEndAt(), ZoneOffset.UTC),
                     4
             );
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+            // Si es nueva donación creada responde 201 Created; si vino de idempotencia responde 200 OK
+            HttpStatus status = (idempotencyKey != null && donacion.getIdempotencyKey() != null)
+                    ? HttpStatus.OK 
+                    : HttpStatus.CREATED;
+
+            return ResponseEntity.status(status).body(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(DonacionResponse.error(e.getMessage()));
         } catch (Exception e) {
             log.error("Error al registrar donación: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(DonacionResponse.error("Error al procesar: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Endpoint previo de consulta para verificación visual del bodeguero
+     * GET /api/donaciones/{id}/detalle-entrega
+     */
+    @GetMapping("/{id}/detalle-entrega")
+    public ResponseEntity<?> obtenerDetalleEntrega(@PathVariable("id") String id) {
+        try {
+            DetalleEntregaResponse detalle = donacionService.obtenerDetalleEntrega(id);
+            return ResponseEntity.ok(detalle);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
 

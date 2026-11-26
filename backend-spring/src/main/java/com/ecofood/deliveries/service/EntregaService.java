@@ -5,6 +5,8 @@ import com.ecofood.deliveries.dto.ValidarEntregaResponse;
 import com.ecofood.deliveries.entity.Entrega;
 import com.ecofood.deliveries.repository.EntregaRepository;
 import com.ecofood.donations.entity.Donacion;
+import com.ecofood.donations.entity.DonationStatus;
+import com.ecofood.donations.exception.DonationConflictException;
 import com.ecofood.donations.repository.DonacionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +20,7 @@ import java.util.Optional;
 public class EntregaService {
 
     private static final Logger log = LoggerFactory.getLogger(EntregaService.class);
+    private static final int MAX_INTENTOS_PIN = 3;
 
     private final EntregaRepository entregaRepository;
     private final DonacionRepository donacionRepository;
@@ -27,47 +30,99 @@ public class EntregaService {
         this.donacionRepository = donacionRepository;
     }
 
+    /**
+     * Valida la entrega mediante PIN de 6 dígitos o Token QR.
+     * Si se ingresa un PIN erróneo:
+     * - Incrementa intentosFallidosPin en la donación.
+     * - Al 3er intento fallido bloquea el PIN y exige obligatoriamente QR.
+     */
     @Transactional
     public ValidarEntregaResponse validarYCompletarEntrega(ValidarEntregaRequest request) {
-        log.info("Iniciando validación transaccional con código: '{}'", request.getCodigo());
+        log.info("Iniciando validación de entrega con código: '{}'", request.getCodigo());
 
         if (request.getCodigo() == null || request.getCodigo().trim().isEmpty()) {
             throw new IllegalArgumentException("Debe ingresar el código PIN o escanear el código QR.");
         }
 
         String codigoLimpio = request.getCodigo().trim();
+        boolean esPin = codigoLimpio.length() == 6 && codigoLimpio.chars().allMatch(Character::isDigit);
 
-        // 1. Búsqueda bloqueante de la entrega activa
+        // 1. Intentar buscar coincidencia directa con bloqueo pesimista
         Optional<Entrega> entregaOpt = entregaRepository.findActiveByCodeWithLock(codigoLimpio);
 
-        if (entregaOpt.isEmpty()) {
-            // Si la base de datos no tiene la entrega (ej. en desarrollo local inicial sin seeds),
-            // verificamos si es un PIN demo de 6 dígitos para resiliencia:
-            if (codigoLimpio.length() == 6 && codigoLimpio.chars().allMatch(Character::isDigit)) {
-                return ValidarEntregaResponse.success(
-                        "deliv-" + System.currentTimeMillis(),
-                        "don-demo-01",
-                        "Alimentos Rescatados Demo",
-                        LocalDateTime.now()
-                );
+        if (entregaOpt.isPresent()) {
+            Entrega entrega = entregaOpt.get();
+
+            // Verificar si el PIN estaba bloqueado en caso de que hayan intentado ingresar por PIN
+            Optional<Donacion> donacionOpt = donacionRepository.findByDonationUuidWithLock(entrega.getDonationId());
+            if (donacionOpt.isPresent()) {
+                Donacion donacion = donacionOpt.get();
+                if (esPin && Boolean.TRUE.equals(donacion.getPinBloqueado())) {
+                    throw new DonationConflictException(
+                            "El acceso por PIN ha sido bloqueado por superar 3 intentos fallidos. Debe escanear obligatoriamente el código QR."
+                    );
+                }
             }
-            throw new IllegalStateException("El código PIN/QR no es válido, ya fue completado o ha expirado.");
+
+            return completarExito(entrega);
         }
 
-        Entrega entrega = entregaOpt.get();
+        // 2. Si el código no coincide y es formato PIN (6 dígitos numéricos)
+        if (esPin) {
+            manejarIntentoFallidoPin(codigoLimpio);
+        }
+
+        throw new IllegalArgumentException("El código PIN/QR no es válido, ha caducado o la entrega ya fue confirmada.");
+    }
+
+    private void manejarIntentoFallidoPin(String pinErroneo) {
+        // En un flujo real, si el bodeguero está en el dashboard de una donación específica,
+        // incrementamos el contador de la donación activa reservada.
+        // Buscamos cualquier donación reservada para registrar el intento fallido.
+        Optional<Entrega> anyActiveDelivery = entregaRepository.findAll().stream()
+                .filter(e -> "PENDING_PICKUP".equals(e.getStatus()))
+                .findFirst();
+
+        if (anyActiveDelivery.isPresent()) {
+            String donationId = anyActiveDelivery.get().getDonationId();
+            Optional<Donacion> donacionOpt = donacionRepository.findByDonationUuidWithLock(donationId);
+            if (donacionOpt.isPresent()) {
+                Donacion donacion = donacionOpt.get();
+                int intentos = donacion.getIntentosFallidosPin() + 1;
+                donacion.setIntentosFallidosPin(intentos);
+
+                if (intentos >= MAX_INTENTOS_PIN) {
+                    donacion.setPinBloqueado(true);
+                    donacionRepository.save(donacion);
+                    log.warn("Donación {}: PIN BLOQUEADO por {} intentos fallidos. Exigir QR.", donationId, intentos);
+                    throw new DonationConflictException(
+                            "Has superado el límite de 3 intentos fallidos. La validación por PIN ha sido BLOQUEADA por seguridad. Debe escanear obligatoriamente el código QR."
+                    );
+                } else {
+                    donacionRepository.save(donacion);
+                    int restantes = MAX_INTENTOS_PIN - intentos;
+                    log.warn("Donación {}: PIN erróneo. Intento {}/{}. Quedan {} restantes.", donationId, intentos, MAX_INTENTOS_PIN, restantes);
+                    throw new IllegalArgumentException(
+                            "Código PIN incorrecto. Te quedan " + restantes + " intento(s) antes de que se bloquee el PIN y se exija el código QR."
+                    );
+                }
+            }
+        }
+    }
+
+    private ValidarEntregaResponse completarExito(Entrega entrega) {
         LocalDateTime ahora = LocalDateTime.now();
 
-        // 2. Transición de estados atómica
         entrega.setStatus("COMPLETED");
         entrega.setDeliveredAt(ahora);
         entregaRepository.save(entrega);
 
-        // 3. Actualizar la donación a DELIVERED
         String tituloDonacion = "Donación Rescatada";
-        Optional<Donacion> donacionOpt = donacionRepository.findByDonationUuid(entrega.getDonationId());
+        Optional<Donacion> donacionOpt = donacionRepository.findByDonationUuidWithLock(entrega.getDonationId());
         if (donacionOpt.isPresent()) {
             Donacion donacion = donacionOpt.get();
-            donacion.setStatus("DELIVERED");
+            donacion.setStatus(DonationStatus.DELIVERED);
+            donacion.setIntentosFallidosPin(0); // Reiniciar en éxito
             donacionRepository.save(donacion);
             tituloDonacion = donacion.getTitle();
         }

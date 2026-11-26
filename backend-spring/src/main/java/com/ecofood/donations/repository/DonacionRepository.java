@@ -20,6 +20,15 @@ public interface DonacionRepository extends JpaRepository<Donacion, Long> {
     Optional<Donacion> findByDonationUuid(String donationUuid);
 
     /**
+     * Búsqueda para idempotencia dentro de una ventana de tiempo (ej. últimos 5 minutos)
+     */
+    @Query("SELECT d FROM Donacion d WHERE d.idempotencyKey = :key AND d.createdAt >= :threshold")
+    Optional<Donacion> findByIdempotencyKeyWithinWindow(
+            @Param("key") String key,
+            @Param("threshold") Instant threshold
+    );
+
+    /**
      * Bloqueo pesimista exclusivo (PESSIMISTIC_WRITE) sobre la donación para concurrencia estricta.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -28,18 +37,6 @@ public interface DonacionRepository extends JpaRepository<Donacion, Long> {
 
     @Query("SELECT d FROM Donacion d WHERE d.status = :status ORDER BY d.createdAt DESC")
     List<Donacion> findByStatus(@Param("status") DonationStatus status);
-
-    /**
-     * Donaciones AVAILABLE cuyo pickupEndAt ya venció
-     */
-    @Query("SELECT d FROM Donacion d WHERE d.status = 'AVAILABLE' AND d.pickupEndAt <= :now")
-    List<Donacion> findExpiredAvailableDonations(@Param("now") Instant now);
-
-    /**
-     * Donaciones RESERVED cuyo pickupEndAt superó el margen de gracia (ej. pickupEndAt + 15 min < now)
-     */
-    @Query("SELECT d FROM Donacion d WHERE d.status = 'RESERVED' AND d.pickupEndAt <= :graceThreshold")
-    List<Donacion> findUncollectedReservations(@Param("graceThreshold") Instant graceThreshold);
 
     @Modifying
     @Query("UPDATE Donacion d SET d.status = 'EXPIRED', d.updatedAt = :now WHERE d.status = 'AVAILABLE' AND d.pickupEndAt <= :now")

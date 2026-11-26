@@ -1,7 +1,10 @@
 package com.ecofood.donations.service;
 
+import com.ecofood.auth.entity.Usuario;
+import com.ecofood.auth.repository.UsuarioRepository;
 import com.ecofood.deliveries.entity.Entrega;
 import com.ecofood.deliveries.repository.EntregaRepository;
+import com.ecofood.donations.dto.DetalleEntregaResponse;
 import com.ecofood.donations.dto.NuevaDonacionRequest;
 import com.ecofood.donations.entity.Donacion;
 import com.ecofood.donations.entity.DonationStatus;
@@ -23,26 +26,46 @@ public class DonacionService {
 
     private static final Logger log = LoggerFactory.getLogger(DonacionService.class);
     private static final Duration MIN_TIME_BEFORE_PICKUP = Duration.ofMinutes(15);
+    private static final Duration IDEMPOTENCY_WINDOW = Duration.ofMinutes(5);
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final DonacionRepository donacionRepository;
     private final EntregaRepository entregaRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    public DonacionService(DonacionRepository donacionRepository, EntregaRepository entregaRepository) {
+    public DonacionService(
+            DonacionRepository donacionRepository,
+            EntregaRepository entregaRepository,
+            UsuarioRepository usuarioRepository
+    ) {
         this.donacionRepository = donacionRepository;
         this.entregaRepository = entregaRepository;
+        this.usuarioRepository = usuarioRepository;
     }
 
     /**
-     * Publicar nueva donación con fechas en UTC
+     * Publicar nueva donación con Idempotencia (X-Idempotency-Key) y fechas en UTC.
+     * Si la clave ya se utilizó en los últimos 5 minutos, devuelve la existente.
      */
     @Transactional
-    public Donacion crearDonacion(NuevaDonacionRequest request) {
+    public Donacion crearDonacionIdempotente(NuevaDonacionRequest request, String idempotencyKey) {
+        Instant now = Instant.now();
+
+        // 1. Verificación de Idempotencia en ventana de 5 minutos
+        if (idempotencyKey != null && !idempotencyKey.trim().isEmpty()) {
+            Instant threshold = now.minus(IDEMPOTENCY_WINDOW);
+            Optional<Donacion> existente = donacionRepository.findByIdempotencyKeyWithinWindow(idempotencyKey.trim(), threshold);
+            if (existente.isPresent()) {
+                log.info("Idempotencia activada: Clave {} reutilizada. Devolviendo donación ya registrada: {}",
+                        idempotencyKey, existente.get().getDonationUuid());
+                return existente.get();
+            }
+        }
+
         if (request.getCategoria() == null || request.getCategoria().trim().isEmpty()) {
             throw new IllegalArgumentException("La categoría es obligatoria.");
         }
 
-        Instant now = Instant.now();
         Instant pickupEndAt = request.getPickupEndAt() != null
                 ? request.getPickupEndAt().toInstant(ZoneOffset.UTC)
                 : now.plus(Duration.ofHours(2));
@@ -55,6 +78,7 @@ public class DonacionService {
 
         Donacion donacion = new Donacion();
         donacion.setDonationUuid(donationUuid);
+        donacion.setIdempotencyKey(idempotencyKey != null && !idempotencyKey.isBlank() ? idempotencyKey.trim() : null);
         donacion.setDonorId(request.getDonorId() != null ? request.getDonorId() : "usr-bodega-01");
         donacion.setCategory(request.getCategoria());
         donacion.setTitle(request.getNotasEstado() != null && !request.getNotasEstado().isBlank()
@@ -66,13 +90,14 @@ public class DonacionService {
         donacion.setPickupStartAt(now);
         donacion.setPickupEndAt(pickupEndAt);
         donacion.setStatus(DonationStatus.AVAILABLE);
+        donacion.setIntentosFallidosPin(0);
+        donacion.setPinBloqueado(false);
 
         return donacionRepository.save(donacion);
     }
 
     /**
      * Apartar donación con Bloqueo Pesimista (@Lock PESSIMISTIC_WRITE).
-     * Valida atomicamente que el estado sea AVAILABLE y que falten >= 15 minutos para pickupEndAt.
      */
     @Transactional
     public Map<String, Object> apartarDonacion(String donationUuid, String comedorId) {
@@ -80,33 +105,25 @@ public class DonacionService {
 
         Instant now = Instant.now();
 
-        // 1. Obtener donación con Lock pesimista en base de datos
         Donacion donacion = donacionRepository.findByDonationUuidWithLock(donationUuid)
                 .orElseThrow(() -> new DonationConflictException("La donación solicitada no existe."));
 
-        // 2. Validación de Estado: Solo AVAILABLE puede ser apartada
         if (donacion.getStatus() != DonationStatus.AVAILABLE) {
-            log.warn("Conflicto al apartar: Donación {} tiene estado {}", donationUuid, donacion.getStatus());
             throw new DonationConflictException("La donación ya no está disponible. Estado actual: " + donacion.getStatus());
         }
 
-        // 3. Validación de Ventana Temporal: Deben faltar al menos 15 minutos antes del vencimiento
         Duration tiempoRestante = Duration.between(now, donacion.getPickupEndAt());
         if (tiempoRestante.compareTo(MIN_TIME_BEFORE_PICKUP) < 0) {
-            log.warn("Conflicto al apartar: Donación {} está a menos de 15 minutos de expirar ({})",
-                    donationUuid, donacion.getPickupEndAt());
             throw new DonationConflictException(
                     "No se puede apartar este lote: faltan menos de 15 minutos para la hora límite de recojo (" +
                     Math.max(0, tiempoRestante.toMinutes()) + " min restantes)."
             );
         }
 
-        // 4. Transición atómica de Estado a RESERVED
         donacion.setStatus(DonationStatus.RESERVED);
         donacion.setReservedByComedorId(comedorId);
         donacionRepository.save(donacion);
 
-        // 5. Creación atómica de la Entrega (PIN de 6 dígitos y token QR)
         String pin = String.format("%06d", RANDOM.nextInt(1000000));
         String qrToken = "qr_auth_" + UUID.randomUUID().toString().replace("-", "");
         String deliveryUuid = "deliv-" + UUID.randomUUID().toString().substring(0, 8);
@@ -114,15 +131,12 @@ public class DonacionService {
         Entrega entrega = new Entrega();
         entrega.setDeliveryUuid(deliveryUuid);
         entrega.setDonationId(donacion.getDonationUuid());
-        entrega.setBeneficiaryId(comedorId != null ? comedorId : "usr-comedor-anon");
+        entrega.setBeneficiaryId(comedorId != null ? comedorId : "usr-comedor-01");
         entrega.setPickupPin(pin);
         entrega.setQrAuthToken(qrToken);
         entrega.setStatus("PENDING_PICKUP");
-        entrega.setReservedAt(java.time.LocalDateTime.now()); // Para compatibilidad
+        entrega.setReservedAt(java.time.LocalDateTime.now());
         entregaRepository.save(entrega);
-
-        log.info("Donación {} reservada exitosamente por {}. Entrega {} generada con PIN",
-                donationUuid, comedorId, deliveryUuid);
 
         Map<String, Object> response = new HashMap<>();
         response.put("donationUuid", donacion.getDonationUuid());
@@ -136,42 +150,75 @@ public class DonacionService {
     }
 
     /**
-     * Liberar reserva de donación: Regresa de RESERVED a AVAILABLE
-     * Solo si aún queda tiempo antes de pickupEndAt.
+     * Endpoint previo de consulta para verificación visual del bodeguero
+     * GET /api/donaciones/{id}/detalle-entrega
+     */
+    @Transactional(readOnly = true)
+    public DetalleEntregaResponse obtenerDetalleEntrega(String donationUuid) {
+        Donacion donacion = donacionRepository.findByDonationUuid(donationUuid)
+                .orElseThrow(() -> new IllegalArgumentException("Donación no encontrada con ID: " + donationUuid));
+
+        String comedorNombre = "Comedor Popular Registrado";
+        String representanteNombre = "Presidenta / Responsable";
+        String comedorTelefono = "+51 991 234 567";
+        String comedorDireccion = "Dirección registrada del comedor";
+
+        if (donacion.getReservedByComedorId() != null) {
+            Optional<Usuario> usuarioOpt = usuarioRepository.findByUserUuid(donacion.getReservedByComedorId());
+            if (usuarioOpt.isPresent()) {
+                Usuario u = usuarioOpt.get();
+                comedorNombre = u.getBusinessName();
+                representanteNombre = u.getRepresentativeName() != null ? u.getRepresentativeName() : u.getBusinessName();
+                comedorTelefono = u.getPhone();
+                comedorDireccion = u.getAddressLine();
+            }
+        }
+
+        return DetalleEntregaResponse.from(
+                donacion.getDonationUuid(),
+                donacion.getTitle(),
+                donacion.getCategory(),
+                donacion.getUnitMeasure(),
+                donacion.getStatus().name(),
+                donacion.getPickupEndAt(),
+                donacion.getReservedByComedorId(),
+                comedorNombre,
+                representanteNombre,
+                comedorTelefono,
+                comedorDireccion,
+                donacion.getIntentosFallidosPin(),
+                donacion.getPinBloqueado()
+        );
+    }
+
+    /**
+     * Liberar reserva activa volviendo a AVAILABLE
      */
     @Transactional
     public Donacion liberarReserva(String donationUuid, String comedorId) {
-        log.info("Intento de liberar reserva de donación {} por comedor {}", donationUuid, comedorId);
-
         Instant now = Instant.now();
 
         Donacion donacion = donacionRepository.findByDonationUuidWithLock(donationUuid)
                 .orElseThrow(() -> new DonationConflictException("La donación solicitada no existe."));
 
         if (donacion.getStatus() != DonationStatus.RESERVED) {
-            throw new DonationConflictException("La donación no se encuentra en estado RESERVED (Estado actual: " + donacion.getStatus() + ").");
+            throw new DonationConflictException("La donación no se encuentra en estado RESERVED.");
         }
 
-        // Si ya expiró el horario límite, no puede volver a estar AVAILABLE
         if (now.isAfter(donacion.getPickupEndAt())) {
             donacion.setStatus(DonationStatus.EXPIRED);
             donacionRepository.save(donacion);
             throw new DonationConflictException("La reserva no puede reabrirse porque el horario de recojo ya expiró.");
         }
 
-        // Cancelar entrega asociada
         entregaRepository.findByDonationId(donationUuid).ifPresent(entrega -> {
             entrega.setStatus("CANCELLED");
             entregaRepository.save(entrega);
         });
 
-        // Regresar a disponible
         donacion.setStatus(DonationStatus.AVAILABLE);
         donacion.setReservedByComedorId(null);
-        Donacion actualizada = donacionRepository.save(donacion);
-
-        log.info("Donación {} liberada satisfactoriamente y devuelta a AVAILABLE", donationUuid);
-        return actualizada;
+        return donacionRepository.save(donacion);
     }
 
     @Transactional(readOnly = true)
