@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="ecoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#ecoGrad)"/>
+  <circle cx="256" cy="256" r="180" fill="#ffffff" opacity="0.15"/>
+  <!-- Leaf Eco Icon -->
+  <path d="M380 132 C380 132 230 140 180 230 C150 284 165 340 210 365 C255 390 320 375 350 310 C385 235 380 132 380 132 Z" fill="#ffffff"/>
+  <path d="M210 365 C250 300 320 220 380 132" stroke="#059669" stroke-width="16" stroke-linecap="round"/>
+</svg>

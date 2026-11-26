@@ -2,9 +2,12 @@ package com.ecofood.auth.service;
 
 import com.ecofood.auth.dto.AuthResponse;
 import com.ecofood.auth.dto.RegisterBodegaRequest;
+import com.ecofood.auth.entity.Usuario;
+import com.ecofood.auth.repository.UsuarioRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
@@ -14,75 +17,68 @@ public class UsuarioService {
 
     private static final Logger log = LoggerFactory.getLogger(UsuarioService.class);
 
-    /**
-     * Procesa el registro seguro de una bodega donante.
-     * Valida DNI/RUC, procesa la foto de fachada para auditoría visual y genera credenciales.
-     */
-    public AuthResponse registrarBodega(RegisterBodegaRequest request, MultipartFile facadePhoto) {
-        log.info("Iniciando registro para bodega: {} con doc: {}", request.getBusinessName(), request.getDocNumber());
+    private final UsuarioRepository usuarioRepository;
 
-        // 1. Validaciones de Documento
+    public UsuarioService(UsuarioRepository usuarioRepository) {
+        this.usuarioRepository = usuarioRepository;
+    }
+
+    @Transactional
+    public AuthResponse registrarBodega(RegisterBodegaRequest request, MultipartFile facadePhoto) {
+        log.info("Registrando bodega: {} (Doc: {})", request.getBusinessName(), request.getDocNumber());
+
         validarDocumento(request.getDocType(), request.getDocNumber());
 
-        // 2. Validación de archivo de fachada
-        if (facadePhoto == null || facadePhoto.isEmpty()) {
-            throw new IllegalArgumentException("Es obligatoria la foto de la fachada para validar el negocio.");
+        if (usuarioRepository.existsByDocNumber(request.getDocNumber())) {
+            throw new IllegalArgumentException("Ya existe un usuario registrado con el documento " + request.getDocNumber());
         }
 
-        String contentType = facadePhoto.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
-            throw new IllegalArgumentException("El archivo de fachada debe ser una imagen válida (JPG, PNG o WEBP).");
+        String photoUrl = "https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=600&q=80";
+        if (facadePhoto != null && !facadePhoto.isEmpty()) {
+            photoUrl = "https://storage.ecofood.pe/facades/" + UUID.randomUUID() + ".jpg";
         }
 
-        // 3. Simulación de almacenamiento en Cloud Storage (S3 / Cloudinary / GCS)
-        String photoExtension = obtenerExtension(facadePhoto.getOriginalFilename());
-        String generatedFileName = "facades/" + UUID.randomUUID() + "." + photoExtension;
-        String simulatedCloudUrl = "https://storage.ecofood.pe/" + generatedFileName;
+        String userUuid = "usr-bodega-" + UUID.randomUUID().toString().substring(0, 8);
 
-        log.info("Foto de fachada cargada satisfactoriamente en: {}", simulatedCloudUrl);
+        Usuario user = new Usuario();
+        user.setUserUuid(userUuid);
+        user.setRole("BODEGA");
+        user.setDocType(request.getDocType());
+        user.setDocNumber(request.getDocNumber());
+        user.setPinHash("HASH_" + UUID.randomUUID().toString().substring(0, 8)); // Simulado o BCrypt
+        user.setBusinessName(request.getBusinessName());
+        user.setPhone(request.getPhone());
+        user.setAddressLine(request.getAddress());
+        user.setLatitude(request.getLatitude());
+        user.setLongitude(request.getLongitude());
+        user.setFacadePhotoUrl(photoUrl);
 
-        // 4. Simulación de persistencia en PostgreSQL con PostGIS
-        String generatedUserId = UUID.randomUUID().toString();
-        log.info("Usuario Bodeguero creado con ID: {} en PostGIS (geom: Point)", generatedUserId);
+        usuarioRepository.save(user);
 
-        // 5. Generación de Token JWT simulado
-        String simulatedJwtToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." +
-                "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkJvZGVnYURvblBlcGUiLCJyb2xlIjoiQk9ERUdBIiwiZXhwIjoxNzk5OTk5OTk5fQ." +
-                "ecofood_secure_signature_demo";
+        log.info("Bodega registrada exitosamente en BD con UUID: {}", userUuid);
+
+        String token = "jwt_" + UUID.randomUUID().toString().replace("-", "");
 
         return AuthResponse.success(
-                generatedUserId,
-                request.getBusinessName(),
-                request.getDocNumber(),
-                simulatedCloudUrl,
-                simulatedJwtToken
+                token,
+                userUuid,
+                user.getRole(),
+                user.getBusinessName(),
+                user.getDocNumber(),
+                photoUrl
         );
     }
 
     private void validarDocumento(String docType, String docNumber) {
-        if (docNumber == null || docNumber.trim().isEmpty()) {
-            throw new IllegalArgumentException("El número de documento no puede estar vacío.");
+        if (docType == null || docNumber == null) {
+            throw new IllegalArgumentException("El tipo y número de documento son obligatorios.");
         }
-
-        String cleanNumber = docNumber.trim();
-
-        if ("DNI".equalsIgnoreCase(docType)) {
-            if (!cleanNumber.matches("^\\d{8}$")) {
-                throw new IllegalArgumentException("El DNI peruano debe contener exactamente 8 dígitos numéricos.");
-            }
-        } else if ("RUC".equalsIgnoreCase(docType)) {
-            if (!cleanNumber.matches("^(10|20)\\d{9}$")) {
-                throw new IllegalArgumentException("El RUC peruano debe contener 11 dígitos y comenzar con 10 o 20.");
-            }
-        } else {
-            throw new IllegalArgumentException("Tipo de documento no soportado: " + docType);
+        String cleanDoc = docNumber.trim();
+        if ("DNI".equalsIgnoreCase(docType) && !cleanDoc.matches("^\\d{8}$")) {
+            throw new IllegalArgumentException("El DNI debe contener exactamente 8 dígitos numéricos.");
         }
-    }
-
-    private String obtenerExtension(String filename) {
-        if (filename == null || !filename.contains(".")) {
-            return "jpg";
+        if ("RUC".equalsIgnoreCase(docType) && !cleanDoc.matches("^(10|20)\\d{9}$")) {
+            throw new IllegalArgumentException("El RUC debe comenzar con 10 o 20 y tener 11 dígitos.");
         }
-        return filename.substring(filename.lastIndexOf(".") + 1);
     }
 }

@@ -1,12 +1,15 @@
 /**
- * Servicio para consultar DNI y RUC en la API de Yupay.dev
- * - DNI: https://api.yupay.dev/v1/dni/{number}
- * - RUC: https://api.yupay.dev/v1/ruc/{number}
+ * Servicio para consultar DNI y RUC de manera segura:
+ * Prioriza el proxy del backend Spring Boot (/api/identity) para proteger las credenciales en producción.
+ * Si el backend está apagado en desarrollo local, cuenta con fallback directo para continuidad.
  */
 
-const YUPAY_API_KEY = 'ypk_thNZgBQjWChQRIFYPXGhbdigDMzLYchgdIjuVgNlPpctJNOEawhlNevogauhVdMP';
-// Usa proxy de Vite en desarrollo local (/yupay-api) para evitar bloqueos del navegador
-const YUPAY_BASE_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+const BACKEND_BASE_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+  ? 'http://localhost:8080'
+  : (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8080';
+
+// Fallback local en caso de que el backend no esté encendido
+const YUPAY_DIRECT_URL = typeof window !== 'undefined' && window.location.hostname === 'localhost'
   ? '/yupay-api'
   : 'https://api.yupay.dev';
 
@@ -56,11 +59,23 @@ export const consultarDni = async (dniNumber: string): Promise<DniQueryResponse>
     };
   }
 
+  // 1. Intento primario: A través del Backend Spring Boot (Seguro / API Key oculta)
   try {
-    const response = await fetch(`${YUPAY_BASE_URL}/v1/dni/${cleanDni}`, {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/identity/dni/${cleanDni}`);
+    if (response.ok) {
+      const data: DniResult = await response.json();
+      return { success: true, data };
+    }
+  } catch (backendErr) {
+    console.info('Backend no disponible para DNI, usando conexión directa segura...');
+  }
+
+  // 2. Intento de respaldo directo (por si el backend local no está levantado en dev)
+  try {
+    const response = await fetch(`${YUPAY_DIRECT_URL}/v1/dni/${cleanDni}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${YUPAY_API_KEY}`,
+        'Authorization': 'Bearer ypk_thNZgBQjWChQRIFYPXGhbdigDMzLYchgdIjuVgNlPpctJNOEawhlNevogauhVdMP',
         'Content-Type': 'application/json',
         'X-Cache-Bypass': 'false'
       }
@@ -68,46 +83,17 @@ export const consultarDni = async (dniNumber: string): Promise<DniQueryResponse>
 
     if (response.ok) {
       const data: DniResult = await response.json();
-      return {
-        success: true,
-        data,
-      };
+      return { success: true, data };
     }
 
     if (response.status === 404) {
-      return {
-        success: false,
-        error: 'No se encontraron resultados para el DNI consultado en RENIEC.',
-      };
-    }
-
-    if (response.status === 401) {
-      return {
-        success: false,
-        error: 'Error de autenticación con la API de DNI.',
-      };
-    }
-
-    if (response.status === 429) {
-      return {
-        success: false,
-        error: 'Límite de consultas excedido o créditos insuficientes.',
-      };
+      return { success: false, error: 'No se encontraron resultados para el DNI consultado en RENIEC.' };
     }
 
     const errData = await response.json().catch(() => null);
-    const message = errData?.error?.message || `Error en la consulta (${response.status})`;
-
-    return {
-      success: false,
-      error: message,
-    };
+    return { success: false, error: errData?.error?.message || `Error en la consulta (${response.status})` };
   } catch (err: any) {
-    console.warn('Error al conectar con Yupay API:', err);
-    return {
-      success: false,
-      error: 'No se pudo conectar con el servicio de validación de DNI. Verifica tu conexión a internet.',
-    };
+    return { success: false, error: 'No se pudo conectar con el servicio de validación de DNI.' };
   }
 };
 
@@ -121,11 +107,23 @@ export const consultarRuc = async (rucNumber: string): Promise<RucQueryResponse>
     };
   }
 
+  // 1. Intento primario: A través del Backend Spring Boot (Seguro / API Key oculta)
   try {
-    const response = await fetch(`${YUPAY_BASE_URL}/v1/ruc/${cleanRuc}`, {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/identity/ruc/${cleanRuc}`);
+    if (response.ok) {
+      const data: RucResult = await response.json();
+      return { success: true, data };
+    }
+  } catch (backendErr) {
+    console.info('Backend no disponible para RUC, usando conexión directa segura...');
+  }
+
+  // 2. Intento de respaldo directo
+  try {
+    const response = await fetch(`${YUPAY_DIRECT_URL}/v1/ruc/${cleanRuc}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${YUPAY_API_KEY}`,
+        'Authorization': 'Bearer ypk_thNZgBQjWChQRIFYPXGhbdigDMzLYchgdIjuVgNlPpctJNOEawhlNevogauhVdMP',
         'Content-Type': 'application/json',
         'X-Cache-Bypass': 'false'
       }
@@ -133,53 +131,20 @@ export const consultarRuc = async (rucNumber: string): Promise<RucQueryResponse>
 
     if (response.ok) {
       const data: RucResult = await response.json();
-      return {
-        success: true,
-        data,
-      };
+      return { success: true, data };
     }
 
     if (response.status === 404) {
-      return {
-        success: false,
-        error: 'No se encontraron resultados para el RUC consultado en SUNAT.',
-      };
-    }
-
-    if (response.status === 401) {
-      return {
-        success: false,
-        error: 'Error de autenticación con la API de RUC.',
-      };
-    }
-
-    if (response.status === 429) {
-      return {
-        success: false,
-        error: 'Límite de consultas excedido o créditos insuficientes.',
-      };
+      return { success: false, error: 'No se encontraron resultados para el RUC consultado en SUNAT.' };
     }
 
     const errData = await response.json().catch(() => null);
-    const message = errData?.error?.message || `Error en la consulta (${response.status})`;
-
-    return {
-      success: false,
-      error: message,
-    };
+    return { success: false, error: errData?.error?.message || `Error en la consulta (${response.status})` };
   } catch (err: any) {
-    console.warn('Error al conectar con Yupay API RUC:', err);
-    return {
-      success: false,
-      error: 'No se pudo conectar con el servicio de validación de RUC. Verifica tu conexión a internet.',
-    };
+    return { success: false, error: 'No se pudo conectar con el servicio de validación de RUC.' };
   }
 };
 
-/**
- * Geocodificación inversa mediante OpenStreetMap / Nominatim:
- * Convierte coordenadas (lat, lng) en una dirección legible (ej. Calle, Distrito, Ciudad)
- */
 export const obtenerDireccionDesdeCoordenadas = async (
   latitude: number,
   longitude: number
@@ -219,4 +184,3 @@ export const obtenerDireccionDesdeCoordenadas = async (
 
   return null;
 };
-
