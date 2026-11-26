@@ -38,11 +38,11 @@ public class DonacionController {
     public ResponseEntity<?> obtenerDonacionesCercanas(
             @RequestParam("latitud") Double latitud,
             @RequestParam("longitud") Double longitud,
-            @RequestParam(value = "radioMetros", defaultValue = "2000.0") Double radioMetros
+            @RequestParam(value = "radioMetros", defaultValue = "3000.0") Double radioMetros
     ) {
-        List<Donacion> disponibles = donacionService.listarDisponibles();
-        if (!disponibles.isEmpty()) {
-            return ResponseEntity.ok(disponibles);
+        var cercanas = donacionService.buscarRadarCercanas(latitud, longitud, radioMetros);
+        if (cercanas != null && !cercanas.isEmpty()) {
+            return ResponseEntity.ok(cercanas);
         }
         return ResponseEntity.ok(crearDonacionesMock(latitud, longitud));
     }

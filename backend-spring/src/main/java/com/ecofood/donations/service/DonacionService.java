@@ -135,7 +135,7 @@ public class DonacionService {
         entrega.setPickupPin(pin);
         entrega.setQrAuthToken(qrToken);
         entrega.setStatus("PENDING_PICKUP");
-        entrega.setReservedAt(java.time.LocalDateTime.now());
+        entrega.setReservedAt(Instant.now());
         entregaRepository.save(entrega);
 
         Map<String, Object> response = new HashMap<>();
@@ -224,6 +224,41 @@ public class DonacionService {
     @Transactional(readOnly = true)
     public List<Donacion> listarDisponibles() {
         return donacionRepository.findByStatus(DonationStatus.AVAILABLE);
+    }
+
+    /**
+     * Consulta optimizada con Bounding Box preliminar y fórmula de Haversine exacta.
+     * Radio por defecto: 3000 metros (3 km).
+     * Velocidad estimada a pie: 75 m/minuto (4.5 km/h).
+     */
+    @Transactional(readOnly = true)
+    public List<com.ecofood.donations.repository.DonacionCercanaProjection> buscarRadarCercanas(
+            double userLat,
+            double userLng,
+            Double radioMetros
+    ) {
+        double maxRadius = (radioMetros != null && radioMetros > 0) ? radioMetros : 3000.0;
+        
+        // 1 grado de latitud equivale aprox a 111,000 metros
+        double deltaLat = maxRadius / 111000.0;
+        // 1 grado de longitud varía según el coseno de la latitud
+        double deltaLng = maxRadius / (111000.0 * Math.cos(Math.toRadians(userLat)));
+
+        double minLat = userLat - deltaLat;
+        double maxLat = userLat + deltaLat;
+        double minLng = userLng - deltaLng;
+        double maxLng = userLng + deltaLng;
+
+        return donacionRepository.findAvailableDonationsRadar(
+                userLat,
+                userLng,
+                minLat,
+                maxLat,
+                minLng,
+                maxLng,
+                maxRadius,
+                Instant.now()
+        );
     }
 
     private String formatearCantidad(String rango, Double exacta) {

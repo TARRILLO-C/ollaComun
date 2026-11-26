@@ -1,41 +1,54 @@
 package com.ecofood.deliveries.entity;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
-@Table(name = "deliveries")
+@Table(name = "deliveries", indexes = {
+    @Index(name = "idx_deliveries_uuid", columnList = "delivery_uuid"),
+    @Index(name = "idx_deliveries_donation", columnList = "donation_id"),
+    @Index(name = "idx_deliveries_beneficiary", columnList = "beneficiary_id"),
+    @Index(name = "idx_deliveries_pin_status", columnList = "pickup_pin, status"),
+    @Index(name = "idx_deliveries_qr_status", columnList = "qr_auth_token, status")
+})
 public class Entrega {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "delivery_uuid", unique = true, nullable = false)
+    @Column(name = "delivery_uuid", unique = true, nullable = false, length = 64)
     private String deliveryUuid;
 
-    @Column(name = "donation_id", nullable = false)
+    @Column(name = "donation_id", nullable = false, length = 64)
     private String donationId;
 
-    @Column(name = "beneficiary_id", nullable = false)
+    @Column(name = "beneficiary_id", nullable = false, length = 64)
     private String beneficiaryId; // UUID del comedor popular
 
-    @Column(name = "pickup_pin", nullable = false)
+    @Column(name = "pickup_pin", nullable = false, length = 10)
     private String pickupPin;
 
-    @Column(name = "qr_auth_token", nullable = false)
+    @Column(name = "qr_auth_token", nullable = false, length = 255)
     private String qrAuthToken;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 30)
     private String status = "PENDING_PICKUP"; // "PENDING_PICKUP" | "COMPLETED" | "CANCELLED"
 
-    @Column(name = "reserved_at")
-    private LocalDateTime reservedAt = LocalDateTime.now();
+    @Column(name = "reserved_at", nullable = false, updatable = false)
+    private Instant reservedAt = Instant.now();
 
     @Column(name = "delivered_at")
-    private LocalDateTime deliveredAt;
+    private Instant deliveredAt;
 
     public Entrega() {}
+
+    @PrePersist
+    public void prePersist() {
+        if (this.reservedAt == null) {
+            this.reservedAt = Instant.now();
+        }
+    }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -58,9 +71,9 @@ public class Entrega {
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
-    public LocalDateTime getReservedAt() { return reservedAt; }
-    public void setReservedAt(LocalDateTime reservedAt) { this.reservedAt = reservedAt; }
+    public Instant getReservedAt() { return reservedAt; }
+    public void setReservedAt(Instant reservedAt) { this.reservedAt = reservedAt; }
 
-    public LocalDateTime getDeliveredAt() { return deliveredAt; }
-    public void setDeliveredAt(LocalDateTime deliveredAt) { this.deliveredAt = deliveredAt; }
+    public Instant getDeliveredAt() { return deliveredAt; }
+    public void setDeliveredAt(Instant deliveredAt) { this.deliveredAt = deliveredAt; }
 }

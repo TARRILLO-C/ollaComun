@@ -16,6 +16,7 @@ import {
   Download,
   Smartphone
 } from 'lucide-react';
+import { InstallPwaModal } from './InstallPwaModal';
 
 interface MobileShellProps {
   children: React.ReactNode;
@@ -36,6 +37,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [showInstallBanner, setShowInstallBanner] = useState(true);
+  const [showInstallModal, setShowInstallModal] = useState(false);
 
   // Escuchar el evento PWA 'beforeinstallprompt' para descarga e instalación en local
   useEffect(() => {
@@ -58,7 +60,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
     };
   }, []);
 
-  const handleInstallClick = async () => {
+  const handleNativeInstall = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
@@ -66,10 +68,12 @@ export const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
         setIsInstallable(false);
       }
       setDeferredPrompt(null);
-    } else {
-      // Guía rápida si el navegador no soporta el prompt directo (ej. Safari o escritorio manual)
-      alert('Para instalar en tu celular o PC:\n\n1. En Chrome/Edge: Presiona el ícono "Instalar" en la barra de direcciones o menú "Instalar EcoFood".\n2. En iPhone/Safari: Presiona "Compartir" y luego "Agregar a pantalla de inicio".');
     }
+  };
+
+  const handleInstallClick = () => {
+    // Abrir siempre el modal visual explicativo con soporte de instalación en 1 clic
+    setShowInstallModal(true);
   };
 
   return (
@@ -216,6 +220,14 @@ export const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
           </nav>
         )}
       </div>
+
+      {/* Modal Visual Moderno de Instalación PWA */}
+      <InstallPwaModal 
+        isOpen={showInstallModal}
+        onClose={() => setShowInstallModal(false)}
+        canInstallNative={!!deferredPrompt}
+        onNativeInstall={handleNativeInstall}
+      />
     </>
   );
 };

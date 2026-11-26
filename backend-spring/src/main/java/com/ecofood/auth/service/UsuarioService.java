@@ -30,7 +30,8 @@ public class UsuarioService {
         validarDocumento(request.getDocType(), request.getDocNumber());
 
         if (usuarioRepository.existsByDocNumber(request.getDocNumber())) {
-            throw new IllegalArgumentException("Ya existe un usuario registrado con el documento " + request.getDocNumber());
+            throw new IllegalArgumentException(
+                    "Ya existe un usuario registrado con el documento " + request.getDocNumber());
         }
 
         String photoUrl = "https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=600&q=80";
@@ -60,13 +61,11 @@ public class UsuarioService {
         String token = "jwt_" + UUID.randomUUID().toString().replace("-", "");
 
         return AuthResponse.success(
-                token,
                 userUuid,
-                user.getRole(),
                 user.getBusinessName(),
                 user.getDocNumber(),
-                photoUrl
-        );
+                photoUrl,
+                token);
     }
 
     private void validarDocumento(String docType, String docNumber) {

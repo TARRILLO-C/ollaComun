@@ -7,7 +7,8 @@ import java.time.Instant;
 @Table(name = "donations", indexes = {
     @Index(name = "idx_donation_uuid", columnList = "donation_uuid"),
     @Index(name = "idx_idempotency_key", columnList = "idempotency_key"),
-    @Index(name = "idx_status_pickup_end", columnList = "status, pickup_end_at")
+    @Index(name = "idx_status_pickup_end", columnList = "status, pickup_end_at"),
+    @Index(name = "idx_donations_radar_bbox", columnList = "status, latitude, longitude, pickup_end_at")
 })
 public class Donacion {
 

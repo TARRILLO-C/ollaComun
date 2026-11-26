@@ -1,10 +1,14 @@
 package com.ecofood.auth.entity;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", indexes = {
+    @Index(name = "idx_users_uuid", columnList = "user_uuid"),
+    @Index(name = "idx_users_role", columnList = "role"),
+    @Index(name = "idx_users_lat_lng", columnList = "latitude, longitude")
+})
 public class Usuario {
 
     @Id
@@ -51,10 +55,17 @@ public class Usuario {
     @Column(name = "is_verified")
     private Boolean isVerified = true;
 
-    @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt = Instant.now();
 
     public Usuario() {}
+
+    @PrePersist
+    public void prePersist() {
+        if (this.createdAt == null) {
+            this.createdAt = Instant.now();
+        }
+    }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -104,6 +115,6 @@ public class Usuario {
     public Boolean getIsVerified() { return isVerified; }
     public void setIsVerified(Boolean isVerified) { this.isVerified = isVerified; }
 
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 }

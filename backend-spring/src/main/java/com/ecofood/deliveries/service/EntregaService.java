@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -111,13 +112,14 @@ public class EntregaService {
     }
 
     private ValidarEntregaResponse completarExito(Entrega entrega) {
-        LocalDateTime ahora = LocalDateTime.now();
+        Instant ahora = Instant.now();
 
         entrega.setStatus("COMPLETED");
         entrega.setDeliveredAt(ahora);
         entregaRepository.save(entrega);
 
         String tituloDonacion = "Donación Rescatada";
+        Double kilos = 5.0;
         Optional<Donacion> donacionOpt = donacionRepository.findByDonationUuidWithLock(entrega.getDonationId());
         if (donacionOpt.isPresent()) {
             Donacion donacion = donacionOpt.get();
@@ -125,15 +127,18 @@ public class EntregaService {
             donacion.setIntentosFallidosPin(0); // Reiniciar en éxito
             donacionRepository.save(donacion);
             tituloDonacion = donacion.getTitle();
+            if (donacion.getQuantityValue() != null) {
+                kilos = donacion.getQuantityValue();
+            }
         }
 
         log.info("Entrega {} completada y donación {} sellada con éxito", entrega.getDeliveryUuid(), entrega.getDonationId());
 
         return ValidarEntregaResponse.success(
-                entrega.getDeliveryUuid(),
                 entrega.getDonationId(),
-                tituloDonacion,
-                ahora
+                LocalDateTime.ofInstant(ahora, java.time.ZoneId.of("America/Lima")),
+                kilos,
+                tituloDonacion
         );
     }
 }
