@@ -273,7 +273,12 @@ export const QRScanner = ({
                   inputMode="numeric"
                   maxLength={6}
                   value={pinInput}
-                  onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
+                  onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  onKeyDown={(e) => {
+                    if (!/[\d]|Backspace|Tab|ArrowLeft|ArrowRight|Delete|Enter/.test(e.key) && !e.ctrlKey) {
+                      e.preventDefault();
+                    }
+                  }}
                   placeholder="000000"
                   className="w-full text-center text-3xl tracking-[8px] font-mono font-black bg-slate-50 border-2 border-slate-200 focus:border-emerald-600 rounded-2xl py-3 text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-600 transition-all placeholder-slate-300"
                   autoFocus

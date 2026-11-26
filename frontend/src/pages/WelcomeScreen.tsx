@@ -153,11 +153,17 @@ export const WelcomeScreen: React.FC = () => {
                 <div className="relative">
                   <input
                     type="text"
+                    inputMode="numeric"
                     maxLength={11}
                     value={docNumber}
                     onChange={(e) => {
-                      setDocNumber(e.target.value.replace(/\D/g, ''));
+                      setDocNumber(e.target.value.replace(/\D/g, '').slice(0, 11));
                       if (loginError) setLoginError('');
+                    }}
+                    onKeyDown={(e) => {
+                      if (!/[\d]|Backspace|Tab|ArrowLeft|ArrowRight|Delete|Enter/.test(e.key) && !e.ctrlKey) {
+                        e.preventDefault();
+                      }
                     }}
                     placeholder="Ej. 45678912 o 20601234567"
                     className="w-full bg-slate-50 border border-slate-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-mono placeholder:text-slate-400 focus:outline-none transition-all"
@@ -180,12 +186,17 @@ export const WelcomeScreen: React.FC = () => {
                 <div className="relative">
                   <input
                     type={showPin ? 'text' : 'password'}
-                    maxLength={6}
+                    maxLength={4}
                     inputMode="numeric"
                     value={pin}
                     onChange={(e) => {
-                      setPin(e.target.value.replace(/\D/g, ''));
+                      setPin(e.target.value.replace(/\D/g, '').slice(0, 4));
                       if (loginError) setLoginError('');
+                    }}
+                    onKeyDown={(e) => {
+                      if (!/[\d]|Backspace|Tab|ArrowLeft|ArrowRight|Delete|Enter/.test(e.key) && !e.ctrlKey) {
+                        e.preventDefault();
+                      }
                     }}
                     placeholder="••••"
                     className="w-full bg-slate-50 border border-slate-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 font-mono tracking-widest placeholder:tracking-normal placeholder:text-slate-400 focus:outline-none transition-all"

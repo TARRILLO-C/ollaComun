@@ -1,21 +1,21 @@
 import React, { useState } from 'react';
-import { 
-  Soup, 
-  ArrowLeft, 
-  CheckCircle2, 
-  AlertCircle, 
-  ShieldCheck, 
-  Loader2, 
-  Phone, 
-  MapPin, 
-  Navigation, 
-  Compass, 
-  ExternalLink, 
-  Users, 
-  HeartHandshake, 
-  Search, 
-  Crosshair, 
-  Lock, 
+import {
+  Soup,
+  ArrowLeft,
+  CheckCircle2,
+  AlertCircle,
+  ShieldCheck,
+  Loader2,
+  Phone,
+  MapPin,
+  Navigation,
+  Compass,
+  ExternalLink,
+  Users,
+  HeartHandshake,
+  Search,
+  Crosshair,
+  Lock,
   X,
   UserCheck,
   Sparkles
@@ -69,14 +69,14 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
 
     try {
       // 1. Filtrar regiones peruanas
-      const localMatches = POPULAR_PERU_REGIONS.filter(z => 
+      const localMatches = POPULAR_PERU_REGIONS.filter(z =>
         z.name.toLowerCase().includes(query.toLowerCase()) ||
         z.address.toLowerCase().includes(query.toLowerCase())
       );
 
       // 2. Consulta de geocodificación abierta a nivel NACIONAL en Perú (sin forzar Lima)
-      const searchQuery = query.toLowerCase().includes('peru') || query.toLowerCase().includes('perú') 
-        ? query 
+      const searchQuery = query.toLowerCase().includes('peru') || query.toLowerCase().includes('perú')
+        ? query
         : `${query}, Perú`;
 
       const response = await fetch(
@@ -291,11 +291,11 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
   return (
     <div className="flex-1 w-full overflow-y-auto px-4 py-2 pb-28 text-slate-800">
       <div className="w-full bg-white border border-slate-200/90 rounded-2xl p-5 shadow-lg shadow-orange-950/5">
-        
+
         {/* Header con botón de regreso */}
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
           {onBack ? (
-            <button 
+            <button
               type="button"
               onClick={onBack}
               className="p-2 -ml-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-colors flex items-center gap-1 text-xs font-semibold"
@@ -304,7 +304,7 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
               <span>Atrás</span>
             </button>
           ) : <div />}
-          
+
           <div className="flex items-center gap-1.5 px-3 py-1 bg-orange-50 text-orange-800 rounded-full border border-orange-200 text-xs font-bold uppercase tracking-wider">
             <Soup size={15} />
             <span>Registro Comedor / Olla</span>
@@ -355,9 +355,8 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
                   if (errors.businessName) setErrors(prev => ({ ...prev, businessName: undefined }));
                 }}
                 placeholder="Ej. Comedor Santa Rosa de Lima / Olla Común Las Guerreras"
-                className={`w-full bg-slate-50 border ${
-                  errors.businessName ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
-                } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all`}
+                className={`w-full bg-slate-50 border ${errors.businessName ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
+                  } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all`}
               />
               {errors.businessName && (
                 <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
@@ -381,9 +380,8 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
                     if (errors.representativeName) setErrors(prev => ({ ...prev, representativeName: undefined }));
                   }}
                   placeholder="Ej. Rosa Meléndez Quispe"
-                  className={`w-full bg-slate-50 border ${
-                    errors.representativeName ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
-                  } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all`}
+                  className={`w-full bg-slate-50 border ${errors.representativeName ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
+                    } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all`}
                 />
                 {errors.representativeName && (
                   <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
@@ -406,10 +404,11 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
                   <div className="relative flex-1">
                     <input
                       type="text"
+                      inputMode="numeric"
                       maxLength={8}
                       value={docNumber}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '');
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 8);
                         setDocNumber(val);
                         setDniSuccessMessage('');
                         setDniErrorMessage('');
@@ -418,10 +417,14 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
                           handleConsultarDni(val);
                         }
                       }}
+                      onKeyDown={(e) => {
+                        if (!/[\d]|Backspace|Tab|ArrowLeft|ArrowRight|Delete|Enter/.test(e.key) && !e.ctrlKey) {
+                          e.preventDefault();
+                        }
+                      }}
                       placeholder="Ej. 45678912"
-                      className={`w-full bg-slate-50 border ${
-                        errors.docNumber ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
-                      } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all font-mono`}
+                      className={`w-full bg-slate-50 border ${errors.docNumber ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
+                        } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all font-mono`}
                     />
                     <span className="absolute right-3 top-2.5 text-xs font-semibold text-slate-400">
                       {docNumber.length}/8
@@ -477,13 +480,17 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
                 inputMode="numeric"
                 value={pin}
                 onChange={(e) => {
-                  setPin(e.target.value.replace(/\D/g, ''));
+                  setPin(e.target.value.replace(/\D/g, '').slice(0, 4));
                   if (errors.pin) setErrors(prev => ({ ...prev, pin: undefined }));
                 }}
+                onKeyDown={(e) => {
+                  if (!/[\d]|Backspace|Tab|ArrowLeft|ArrowRight|Delete|Enter/.test(e.key) && !e.ctrlKey) {
+                    e.preventDefault();
+                  }
+                }}
                 placeholder="Elige un PIN de 4 números (ej. 1234)"
-                className={`w-full bg-slate-50 border ${
-                  errors.pin ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
-                } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all font-mono`}
+                className={`w-full bg-slate-50 border ${errors.pin ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
+                  } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all font-mono`}
               />
               <span className="text-[10px] text-slate-400 block mt-1">
                 Usarás este PIN junto con tu DNI para iniciar sesión de forma segura.
@@ -504,15 +511,22 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
                 </label>
                 <input
                   type="tel"
+                  maxLength={9}
+                  inputMode="numeric"
                   value={phone}
                   onChange={(e) => {
-                    setPhone(e.target.value);
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 9);
+                    setPhone(val);
                     if (errors.phone) setErrors(prev => ({ ...prev, phone: undefined }));
                   }}
-                  placeholder="991 234 567"
-                  className={`w-full bg-slate-50 border ${
-                    errors.phone ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
-                  } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all font-mono`}
+                  onKeyDown={(e) => {
+                    if (!/[\d]|Backspace|Tab|ArrowLeft|ArrowRight|Delete/.test(e.key) && !e.ctrlKey) {
+                      e.preventDefault();
+                    }
+                  }}
+                  placeholder="991234567 (9 dígitos)"
+                  className={`w-full bg-slate-50 border ${errors.phone ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
+                    } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all font-mono`}
                 />
                 {errors.phone && (
                   <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
@@ -553,9 +567,8 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
                   if (errors.address) setErrors(prev => ({ ...prev, address: undefined }));
                 }}
                 placeholder="Jr. Los Claveles 380, San Juan de Lurigancho"
-                className={`w-full bg-slate-50 border ${
-                  errors.address ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
-                } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all`}
+                className={`w-full bg-slate-50 border ${errors.address ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500'
+                  } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all`}
               />
               {errors.address && (
                 <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
@@ -618,8 +631,8 @@ export const RegisterComedor = ({ onBack, onRegistrationSuccess }) => {
                 {/* Resultados sugeridos del buscador */}
                 {searchResults.length > 0 && (
                   <>
-                    <div 
-                      className="fixed inset-0 z-20" 
+                    <div
+                      className="fixed inset-0 z-20"
                       onClick={() => setSearchResults([])}
                     />
                     <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-30 max-h-48 overflow-y-auto divide-y divide-slate-100 animate-fade-in">

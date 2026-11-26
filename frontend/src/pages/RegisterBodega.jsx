@@ -444,10 +444,12 @@ export const RegisterBodega = ({ onBack, onRegistrationSuccess }) => {
                 <div className="relative flex-1">
                   <input
                     type="text"
+                    inputMode="numeric"
                     maxLength={docType === 'RUC' ? 11 : 8}
                     value={docNumber}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '');
+                      const limit = docType === 'RUC' ? 11 : 8;
+                      const val = e.target.value.replace(/\D/g, '').slice(0, limit);
                       setDocNumber(val);
                       setDocSuccessMessage('');
                       setDocErrorMessage('');
@@ -456,6 +458,11 @@ export const RegisterBodega = ({ onBack, onRegistrationSuccess }) => {
                         handleConsultarDocumento(val);
                       } else if (docType === 'RUC' && val.length === 11) {
                         handleConsultarDocumento(val);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (!/[\d]|Backspace|Tab|ArrowLeft|ArrowRight|Delete|Enter/.test(e.key) && !e.ctrlKey) {
+                        e.preventDefault();
                       }
                     }}
                     placeholder={docType === 'RUC' ? 'Ej. 20100055237 (11 dígitos)' : 'Ej. 45678912 (8 dígitos)'}
@@ -516,8 +523,13 @@ export const RegisterBodega = ({ onBack, onRegistrationSuccess }) => {
                 inputMode="numeric"
                 value={pin}
                 onChange={(e) => {
-                  setPin(e.target.value.replace(/\D/g, ''));
+                  setPin(e.target.value.replace(/\D/g, '').slice(0, 4));
                   if (errors.pin) setErrors(prev => ({ ...prev, pin: undefined }));
+                }}
+                onKeyDown={(e) => {
+                  if (!/[\d]|Backspace|Tab|ArrowLeft|ArrowRight|Delete|Enter/.test(e.key) && !e.ctrlKey) {
+                    e.preventDefault();
+                  }
                 }}
                 placeholder="Elige un PIN de 4 números (ej. 1234)"
                 className={`w-full bg-slate-50 border ${
@@ -565,12 +577,20 @@ export const RegisterBodega = ({ onBack, onRegistrationSuccess }) => {
                 </label>
                 <input
                   type="tel"
+                  maxLength={9}
+                  inputMode="numeric"
                   value={phone}
                   onChange={(e) => {
-                    setPhone(e.target.value);
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 9);
+                    setPhone(val);
                     if (errors.phone) setErrors(prev => ({ ...prev, phone: undefined }));
                   }}
-                  placeholder="987 654 321"
+                  onKeyDown={(e) => {
+                    if (!/[\d]|Backspace|Tab|ArrowLeft|ArrowRight|Delete/.test(e.key) && !e.ctrlKey) {
+                      e.preventDefault();
+                    }
+                  }}
+                  placeholder="987654321 (9 dígitos)"
                   className={`w-full bg-slate-50 border ${
                     errors.phone ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600'
                   } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition-all font-mono`}

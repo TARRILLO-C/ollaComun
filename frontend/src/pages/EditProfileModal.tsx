@@ -452,15 +452,23 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ onClose, tar
               </label>
               <input
                 type="tel"
+                maxLength={9}
+                inputMode="numeric"
                 value={phone}
                 onChange={(e) => {
-                  setPhone(e.target.value);
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 9);
+                  setPhone(val);
                   if (errors.phone) setErrors(prev => ({ ...prev, phone: '' }));
+                }}
+                onKeyDown={(e) => {
+                  if (!/[\d]|Backspace|Tab|ArrowLeft|ArrowRight|Delete/.test(e.key) && !e.ctrlKey) {
+                    e.preventDefault();
+                  }
                 }}
                 className={`w-full bg-slate-50 border ${
                   errors.phone ? 'border-red-400 ring-1 ring-red-400' : 'border-slate-300 focus:ring-1 focus:ring-emerald-600'
                 } rounded-xl px-3.5 py-2.5 text-sm text-slate-900 font-mono`}
-                placeholder="987 654 321"
+                placeholder="987654321 (9 dígitos)"
               />
               {errors.phone && (
                 <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
