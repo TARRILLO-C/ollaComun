@@ -41,22 +41,39 @@ export const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
 
   // Escuchar el evento PWA 'beforeinstallprompt' para descarga e instalación en local
   useEffect(() => {
+    // Si ya fue capturado antes de que React cargue
+    if ((window as any).deferredPwaPrompt) {
+      setDeferredPrompt((window as any).deferredPwaPrompt);
+      setIsInstallable(true);
+    }
+
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      (window as any).deferredPwaPrompt = e;
       setIsInstallable(true);
     };
 
+    const handleCustomAvailable = (e: any) => {
+      if (e.detail) {
+        setDeferredPrompt(e.detail);
+        setIsInstallable(true);
+      }
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('pwa-prompt-available', handleCustomAvailable);
 
     // Ocultar si ya se instaló
     window.addEventListener('appinstalled', () => {
       setIsInstallable(false);
       setDeferredPrompt(null);
+      (window as any).deferredPwaPrompt = null;
     });
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('pwa-prompt-available', handleCustomAvailable);
     };
   }, []);
 

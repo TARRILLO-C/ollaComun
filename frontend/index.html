@@ -12,6 +12,20 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <title>EcoFood | Salvemos alimentos juntos</title>
+    <script>
+      // Capturar beforeinstallprompt antes de que React cargue para no perder el evento
+      window.deferredPwaPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.deferredPwaPrompt = e;
+        window.dispatchEvent(new CustomEvent('pwa-prompt-available', { detail: e }));
+        console.log('[PWA] Evento beforeinstallprompt capturado con éxito');
+      });
+      window.addEventListener('appinstalled', function() {
+        window.deferredPwaPrompt = null;
+        console.log('[PWA] Aplicación instalada');
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
