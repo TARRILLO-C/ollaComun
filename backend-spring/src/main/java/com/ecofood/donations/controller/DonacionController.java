@@ -3,15 +3,17 @@ package com.ecofood.donations.controller;
 import com.ecofood.donations.dto.DonacionResponse;
 import com.ecofood.donations.dto.NuevaDonacionRequest;
 import com.ecofood.donations.entity.Donacion;
-import com.ecofood.donations.repository.DonacionRepository;
+import com.ecofood.donations.entity.DonationStatus;
+import com.ecofood.donations.exception.DonationConflictException;
+import com.ecofood.donations.service.DonacionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 
 @RestController
@@ -21,15 +23,15 @@ public class DonacionController {
 
     private static final Logger log = LoggerFactory.getLogger(DonacionController.class);
 
-    private final DonacionRepository donacionRepository;
+    private final DonacionService donacionService;
 
-    public DonacionController(DonacionRepository donacionRepository) {
-        this.donacionRepository = donacionRepository;
+    public DonacionController(DonacionService donacionService) {
+        this.donacionService = donacionService;
     }
 
     @GetMapping
     public ResponseEntity<List<Donacion>> listarDonaciones() {
-        return ResponseEntity.ok(donacionRepository.findAllAvailable());
+        return ResponseEntity.ok(donacionService.listarDisponibles());
     }
 
     @GetMapping("/cercanas")
@@ -38,58 +40,28 @@ public class DonacionController {
             @RequestParam("longitud") Double longitud,
             @RequestParam(value = "radioMetros", defaultValue = "2000.0") Double radioMetros
     ) {
-        log.info("Buscando donaciones para [{}, {}] en radio de {}m", latitud, longitud, radioMetros);
-        try {
-            List<Donacion> disponibles = donacionRepository.findAllAvailable();
-            if (!disponibles.isEmpty()) {
-                return ResponseEntity.ok(disponibles);
-            }
-        } catch (Exception e) {
-            log.warn("Excepción al consultar BD: {}", e.getMessage());
+        List<Donacion> disponibles = donacionService.listarDisponibles();
+        if (!disponibles.isEmpty()) {
+            return ResponseEntity.ok(disponibles);
         }
         return ResponseEntity.ok(crearDonacionesMock(latitud, longitud));
     }
 
     @PostMapping
-    @Transactional
     public ResponseEntity<DonacionResponse> crearDonacion(@RequestBody NuevaDonacionRequest request) {
         try {
-            if (request.getCategoria() == null || request.getCategoria().trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(DonacionResponse.error("La categoría es obligatoria."));
-            }
-
-            LocalDateTime pickupEndAt = request.getPickupEndAt() != null 
-                    ? request.getPickupEndAt() 
-                    : LocalDateTime.now().plusHours(2);
-
-            String donationUuid = "don-" + UUID.randomUUID().toString().substring(0, 8);
-            String cantidadTexto = formatearCantidad(request.getCantidadRango(), request.getCantidadExacta());
-
-            Donacion donacion = new Donacion();
-            donacion.setDonationUuid(donationUuid);
-            donacion.setDonorId(request.getDonorId() != null ? request.getDonorId() : "usr-bodega-01");
-            donacion.setCategory(request.getCategoria());
-            donacion.setTitle(request.getNotasEstado() != null && !request.getNotasEstado().isBlank() 
-                    ? request.getNotasEstado() 
-                    : "Alimentos variados del día");
-            donacion.setDescription(request.getNotasEstado());
-            donacion.setQuantityValue(request.getCantidadExacta() != null ? request.getCantidadExacta() : 5.0);
-            donacion.setUnitMeasure(cantidadTexto);
-            donacion.setPickupStartAt(LocalDateTime.now());
-            donacion.setPickupEndAt(pickupEndAt);
-            donacion.setStatus("AVAILABLE");
-
-            donacionRepository.save(donacion);
+            Donacion donacion = donacionService.crearDonacion(request);
 
             DonacionResponse response = DonacionResponse.success(
-                    donationUuid,
-                    request.getCategoria(),
-                    cantidadTexto,
-                    pickupEndAt,
+                    donacion.getDonationUuid(),
+                    donacion.getCategory(),
+                    donacion.getUnitMeasure(),
+                    LocalDateTime.ofInstant(donacion.getPickupEndAt(), ZoneOffset.UTC),
                     4
             );
-
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(DonacionResponse.error(e.getMessage()));
         } catch (Exception e) {
             log.error("Error al registrar donación: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -97,12 +69,62 @@ public class DonacionController {
         }
     }
 
-    private String formatearCantidad(String rango, Double exacta) {
-        if ("EXACTO".equalsIgnoreCase(rango) && exacta != null) return exacta + " kg";
-        if ("1_5_KG".equalsIgnoreCase(rango)) return "1 a 5 kg (~10 raciones)";
-        if ("5_10_KG".equalsIgnoreCase(rango)) return "5 a 10 kg (~20 raciones)";
-        if ("MAS_10_KG".equalsIgnoreCase(rango)) return "Más de 10 kg (Gran lote solidario)";
-        return "Cantidad estimada del día";
+    /**
+     * Endpoint transaccional para apartar/reservar un lote con bloqueo pesimista
+     * POST /api/donaciones/{uuid}/apartar
+     */
+    @PostMapping("/{uuid}/apartar")
+    public ResponseEntity<?> apartarDonacion(
+            @PathVariable("uuid") String uuid,
+            @RequestParam(value = "comedorId", required = false) String comedorId
+    ) {
+        try {
+            Map<String, Object> resultado = donacionService.apartarDonacion(uuid, comedorId);
+            return ResponseEntity.ok(resultado);
+        } catch (DonationConflictException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "status", 409,
+                    "error", "Conflict",
+                    "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "status", 500,
+                    "error", "Internal Error",
+                    "message", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * Endpoint transaccional para liberar una reserva activa
+     * POST /api/donaciones/{uuid}/liberar
+     */
+    @PostMapping("/{uuid}/liberar")
+    public ResponseEntity<?> liberarReserva(
+            @PathVariable("uuid") String uuid,
+            @RequestParam(value = "comedorId", required = false) String comedorId
+    ) {
+        try {
+            Donacion donacion = donacionService.liberarReserva(uuid, comedorId);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Reserva liberada con éxito. Donación devuelta a AVAILABLE.",
+                    "donationUuid", donacion.getDonationUuid(),
+                    "status", donacion.getStatus()
+            ));
+        } catch (DonationConflictException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "status", 409,
+                    "error", "Conflict",
+                    "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "status", 500,
+                    "error", "Internal Error",
+                    "message", e.getMessage()
+            ));
+        }
     }
 
     private List<Map<String, Object>> crearDonacionesMock(Double lat, Double lng) {
