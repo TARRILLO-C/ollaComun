@@ -1,21 +1,26 @@
 {
   "short_name": "EcoFood",
-  "name": "EcoFood - Red de Rescate de Alimentos",
+  "name": "EcoFood - Red Solidaria de Rescate de Alimentos",
+  "description": "Conectamos bodegas donantes con comedores populares para rescatar alimentos aptos en tiempo récord.",
   "icons": [
     {
       "src": "/icon-192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
   "start_url": "/",
-  "background_color": "#F8FAF7",
-  "theme_color": "#1B5E20",
+  "scope": "/",
   "display": "standalone",
-  "orientation": "portrait"
+  "orientation": "portrait-primary",
+  "background_color": "#064e3b",
+  "theme_color": "#059669",
+  "categories": ["food", "social", "productivity"]
 }

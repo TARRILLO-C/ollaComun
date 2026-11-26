@@ -62,17 +62,32 @@ export const MobileShell: React.FC<MobileShellProps> = ({ children }) => {
 
   const handleNativeInstall = async () => {
     if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setIsInstallable(false);
+      try {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          setIsInstallable(false);
+        }
+      } catch (err) {
+        console.error('Error al invocar instalación nativa:', err);
+      } finally {
+        setDeferredPrompt(null);
       }
-      setDeferredPrompt(null);
     }
   };
 
-  const handleInstallClick = () => {
-    // Abrir siempre el modal visual explicativo con soporte de instalación en 1 clic
+  const handleInstallClick = async () => {
+    // Si el navegador ya tiene listo el evento de instalación nativa (Chrome/Edge/Android),
+    // disparar directamente el prompt de instalación del sistema operativo:
+    if (deferredPrompt) {
+      try {
+        await handleNativeInstall();
+        return;
+      } catch (e) {
+        console.warn('Error al activar prompt nativo, abriendo modal explicativo:', e);
+      }
+    }
+    // Si no está el prompt nativo disponible (ej. Safari, iOS o ya instalado), abrir el modal explicativo:
     setShowInstallModal(true);
   };
 
