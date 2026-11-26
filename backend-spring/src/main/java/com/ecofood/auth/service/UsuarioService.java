@@ -68,6 +68,51 @@ public class UsuarioService {
                 token);
     }
 
+    @Transactional
+    public AuthResponse registrarComedor(com.ecofood.auth.dto.RegisterComedorRequest request) {
+        log.info("Registrando comedor popular: {} (Doc: {})", request.getBusinessName(), request.getDocNumber());
+
+        validarDocumento(request.getDocType() != null ? request.getDocType() : "DNI", request.getDocNumber());
+
+        if (usuarioRepository.existsByDocNumber(request.getDocNumber())) {
+            throw new IllegalArgumentException(
+                    "Ya existe un usuario registrado con el documento " + request.getDocNumber());
+        }
+
+        String userUuid = "usr-comedor-" + UUID.randomUUID().toString().substring(0, 8);
+        String photoUrl = "https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=600&q=80";
+
+        Usuario user = new Usuario();
+        user.setUserUuid(userUuid);
+        user.setRole("COMEDOR");
+        user.setDocType(request.getDocType() != null ? request.getDocType() : "DNI");
+        user.setDocNumber(request.getDocNumber());
+        user.setPinHash("HASH_" + UUID.randomUUID().toString().substring(0, 8));
+        user.setBusinessName(request.getBusinessName());
+        user.setRepresentativeName(request.getRepresentativeName());
+        user.setPhone(request.getPhone());
+        user.setAddressLine(request.getAddress());
+        user.setLatitude(request.getLatitude());
+        user.setLongitude(request.getLongitude());
+        user.setFacadePhotoUrl(photoUrl);
+
+        usuarioRepository.save(user);
+
+        log.info("Comedor popular registrado exitosamente en BD con UUID: {}", userUuid);
+
+        String token = "jwt_" + UUID.randomUUID().toString().replace("-", "");
+
+        AuthResponse res = AuthResponse.success(
+                userUuid,
+                user.getBusinessName(),
+                user.getDocNumber(),
+                photoUrl,
+                token
+        );
+        res.setRole("COMEDOR");
+        return res;
+    }
+
     private void validarDocumento(String docType, String docNumber) {
         if (docType == null || docNumber == null) {
             throw new IllegalArgumentException("El tipo y número de documento son obligatorios.");

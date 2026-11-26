@@ -8,6 +8,7 @@ import {
   Coordinates,
   DonationCategory
 } from '../types';
+import { ecofoodApi } from '../services/apiService';
 
 // Función Haversine para calcular distancia en metros (emula ST_Distance de PostGIS)
 export function calculateDistanceInMeters(coord1: Coordinates, coord2: Coordinates): number {
@@ -477,21 +478,34 @@ export const EcoFoodProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   };
 
-  const registerUser = (userData: Partial<User>) => {
+  const registerUser = async (userData: Partial<User>) => {
     const role = userData.role || 'BODEGA';
+
+    // 1. Intentar persistencia real en el backend Spring Boot / MySQL
+    let backendUser: any = null;
+    try {
+      if (role === 'BODEGA') {
+        backendUser = await ecofoodApi.registerBodega(userData);
+      } else {
+        backendUser = await ecofoodApi.registerComedor(userData);
+      }
+    } catch (apiErr) {
+      console.warn('Registro offline/local:', apiErr);
+    }
+
     const newUser: User = {
-      id: `usr-${role.toLowerCase()}-${Date.now().toString().slice(-4)}`,
+      id: backendUser?.userId || `usr-${role.toLowerCase()}-${Date.now().toString().slice(-4)}`,
       role,
       docType: userData.docType || (role === 'BODEGA' ? 'RUC' : 'DNI'),
       docNumber: userData.docNumber || '20123456789',
       pin: userData.pin || '1234',
-      businessName: userData.businessName || (role === 'BODEGA' ? 'Nueva Bodega' : 'Nuevo Comedor'),
+      businessName: backendUser?.businessName || userData.businessName || (role === 'BODEGA' ? 'Nueva Bodega' : 'Nuevo Comedor'),
       representativeName: userData.representativeName || 'Responsable',
       phone: userData.phone || '+51 900 000 000',
       email: userData.email || 'contacto@ecofood.pe',
       addressLine: userData.addressLine || 'Av. Principal 123',
       district: userData.district || 'San Juan de Lurigancho',
-      facadePhotoUrl: userData.facadePhotoUrl || (
+      facadePhotoUrl: backendUser?.facadePhotoUrl || userData.facadePhotoUrl || (
         role === 'BODEGA'
           ? 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=600&q=80'
           : 'https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=600&q=80'

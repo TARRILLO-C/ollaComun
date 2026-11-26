@@ -67,6 +67,25 @@ public class AuthRestController {
     }
 
     /**
+     * Endpoint para el Registro Seguro del Rol Comedor Popular / Olla Común.
+     */
+    @PostMapping("/register-comedor")
+    public ResponseEntity<AuthResponse> registerComedor(
+            @RequestBody com.ecofood.auth.dto.RegisterComedorRequest request
+    ) {
+        try {
+            AuthResponse response = usuarioService.registrarComedor(request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(AuthResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(AuthResponse.error("Error interno al registrar comedor: " + e.getMessage()));
+        }
+    }
+
+    /**
      * Endpoint de verificación rápida de estado del servicio
      */
     @GetMapping("/health")
